@@ -1,11 +1,9 @@
-import * as assert from 'assert';
-import someFn from '../src';
+import { getTableName } from '../src';
 
+describe('Test database-client', function () {
+  it('Get valid snake-cased db-table name', async function () {
+    const result = getTableName('UserSession');
 
-describe('Test someFn', function () {
-  it('No error expected', async function () {
-    const result = someFn();
-
-    expect(result).toBe(200);
+    expect(result).toBe('user_session');
   });
 });
