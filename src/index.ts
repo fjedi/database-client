@@ -275,29 +275,12 @@ function queryBuilder(
   return queryParams;
 }
 
-function createConnection<TModels>(params: {
-  user: string;
-  name: string;
-  password?: string;
-  dbOptions: Options;
-  models: TModels;
-}) {
-  const { name, user, password, dbOptions, models } = params;
-  const connection = new Sequelize(name, user, password, dbOptions);
-  // @ts-ignore
-  connection.Op = Op;
-  // @ts-ignore
-  connection.models = models;
-
-  return connection as DatabaseConnection & {
-    models: TModels;
-  };
-}
-
-export default async function initDatabase<TModels>(
+export function createConnection<TModels>(
   models: TModels,
   options: DatabaseConnectionOptions,
-): Promise<DatabaseConnection & { models: TModels }> {
+): DatabaseConnection & {
+  models: TModels;
+} {
   const {
     engine = 'mysql',
     host = '127.0.0.1',
@@ -349,8 +332,23 @@ export default async function initDatabase<TModels>(
     },
     logging,
   };
+  const connection = new Sequelize(name, user, password, dbOptions);
+  // @ts-ignore
+  connection.Op = Op;
+  // @ts-ignore
+  connection.models = models;
+
+  return connection as DatabaseConnection & {
+    models: TModels;
+  };
+}
+
+export default async function initDatabase<TModels>(
+  models: TModels,
+  options: DatabaseConnectionOptions,
+): Promise<DatabaseConnection & { models: TModels }> {
   // Create db connection instance
-  const connection = createConnection({ name, user, password, dbOptions, models });
+  const connection = createConnection(models, options);
 
   // Checking DB connection
   await connection.authenticate();
