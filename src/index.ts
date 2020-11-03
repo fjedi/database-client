@@ -339,7 +339,7 @@ export default async function initDatabase<TModels>(
   options: DatabaseConnectionOptions,
 ): Promise<DatabaseConnection & { models: TModels }> {
   // Create db connection instance
-  const connection = createConnection(options);
+  const connection = createConnection(options) as DatabaseConnection & { models: TModels };
   // @ts-ignore
   connection.models = models;
 
