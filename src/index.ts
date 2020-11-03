@@ -330,7 +330,7 @@ export function createConnection(options: DatabaseConnectionOptions): DatabaseCo
   };
   const connection = new Sequelize(name, user, password, dbOptions);
   // @ts-ignore
-  connection.Op = Op;
+  connection.is = Op;
 
   return connection as DatabaseConnection;
 }
