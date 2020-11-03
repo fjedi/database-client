@@ -1,6 +1,6 @@
 {
   "name": "@fjedi/database-client",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Wrapper around sequelize ORM with some fancy helpers for caching and full-data-tree sql-joins",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
