@@ -126,7 +126,7 @@ export type DatabaseHelpers = {
 };
 
 export type DatabaseConnection = Sequelize & {
-  is: typeof Op;
+  fieldValue: typeof Op;
   helpers: DatabaseHelpers;
   QueryTypes?: QueryTypes;
   fn?: (functionName: string, columnName: string, args?: string) => string;
@@ -330,7 +330,7 @@ export function createConnection(options: DatabaseConnectionOptions): DatabaseCo
   };
   const connection = new Sequelize(name, user, password, dbOptions);
   // @ts-ignore
-  connection.is = Op;
+  connection.fieldValue = Op;
 
   return connection as DatabaseConnection;
 }
