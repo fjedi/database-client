@@ -1,7 +1,7 @@
 {
-  "name": "@fjedi/npm-package-template",
-  "version": "1.0.1",
-  "description": "NPM package template",
+  "name": "@fjedi/database-client",
+  "version": "1.0.0",
+  "description": "Wrapper around sequelize ORM with some fancy helpers for caching and full-data-tree sql-joins",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "files": [
@@ -26,7 +26,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fjedi/npm-package-template.git"
+    "url": "git+https://github.com/fjedi/database-client.git"
   },
   "keywords": [
     "fjedi"
@@ -34,15 +34,32 @@
   "author": "Alexander Radyushin <r.alex.andr@ya.ru> (https://fjedi.com)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/fjedi/npm-package-template/issues"
+    "url": "https://github.com/fjedi/database-client/issues"
   },
-  "homepage": "https://github.com/fjedi/npm-package-template#readme",
-  "dependencies": {},
+  "homepage": "https://github.com/fjedi/database-client#readme",
+  "dependencies": {
+    "@fjedi/errors": "1.0.0",
+    "@fjedi/logger": "1.0.0",
+    "@fjedi/redis-client": "1.0.1",
+    "bluebird": "3.7.2",
+    "graphql-list-fields": "2.0.2",
+    "json-buffer": "3.0.1",
+    "lodash": "4.17.20",
+    "sequelize": "6.3.5",
+    "sequelize-cli": "6.2.0",
+    "shimmer": "1.2.1",
+    "umzug": "2.3.0"
+  },
   "devDependencies": {
+    "@types/bluebird": "3.5.33",
     "@types/expect": "24.3.0",
+    "@types/graphql-list-fields": "2.0.3",
     "@types/jest": "26.0.15",
+    "@types/json-buffer": "3.0.0",
     "@types/lodash": "4.14.164",
     "@types/node": "14.14.6",
+    "@types/shimmer": "1.0.1",
+    "@types/umzug": "2.3.0",
     "@typescript-eslint/eslint-plugin": "4.6.0",
     "@typescript-eslint/parser": "4.6.0",
     "eslint": "7.12.1",
