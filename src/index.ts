@@ -19,7 +19,7 @@ import getQueryFields from 'graphql-list-fields';
 import { stringify, parse } from 'json-buffer';
 import shimmer from 'shimmer';
 import { logger as rootLogger } from '@fjedi/logger';
-import { RedisClient } from '@fjedi/redis-client';
+import { redis, RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
 
 //
@@ -126,6 +126,8 @@ export type DatabaseHelpers = {
 };
 
 export type DatabaseConnection = Sequelize & {
+  // @ts-ignore
+  Op: Op;
   helpers: DatabaseHelpers;
   QueryTypes?: QueryTypes;
   fn?: (functionName: string, columnName: string, args?: string) => string;
@@ -494,7 +496,7 @@ export async function initDatabase<TModels>(
       if (cachePolicy !== 'no-cache') {
         try {
           //
-          const cached = await connection.redis.getAsync(cacheKey);
+          const cached = await redis.getAsync(cacheKey);
           //
           if (cached) {
             const { rows, count } = parse(cached);
@@ -519,7 +521,7 @@ export async function initDatabase<TModels>(
       //   model
       //     .findAndCountAll(p)
       //     .then(res => {
-      //       connection.redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
+      //       redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       //     })
       //     .catch(logger.error);
       // }
@@ -532,7 +534,7 @@ export async function initDatabase<TModels>(
       }
       //
       if (cachePolicy !== 'no-cache') {
-        connection.redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
+        redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       }
       //
       return res;
@@ -559,7 +561,7 @@ export async function initDatabase<TModels>(
       if (cachePolicy !== 'no-cache') {
         try {
           //
-          const cached = await connection.redis.getAsync(cacheKey);
+          const cached = await redis.getAsync(cacheKey);
           //
           if (cached) {
             cachedInstance = await mapPromise(parse(cached), (r: any) => model.build(r));
@@ -581,7 +583,7 @@ export async function initDatabase<TModels>(
       //   model
       //     .findAll(p)
       //     .then(res => {
-      //       connection.redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
+      //       redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       //     })
       //     .catch(logger.error);
       // }
@@ -594,7 +596,7 @@ export async function initDatabase<TModels>(
       }
       //
       if (cachePolicy !== 'no-cache') {
-        connection.redis.set(cacheKey, stringify(rows), 'PX', cachePeriod);
+        redis.set(cacheKey, stringify(rows), 'PX', cachePeriod);
       }
       //
       return rows;
@@ -603,7 +605,7 @@ export async function initDatabase<TModels>(
       const { cachePeriod = 30000, throwErrorIfNotFound = true, context, resolveInfo, raw } =
         opts || {};
       const cachePolicy =
-        opts?.cacheKey && connection.redis && !resolveInfo
+        opts?.cacheKey && redis && !resolveInfo
           ? get(opts, 'cachePolicy', 'cache-first')
           : 'no-cache';
       //
@@ -615,7 +617,7 @@ export async function initDatabase<TModels>(
       if (cachePolicy !== 'no-cache') {
         try {
           //
-          const cached = await connection.redis.getAsync(cacheKey);
+          const cached = await redis.getAsync(cacheKey);
           cachedInstance = cached ? model.build(parse(cached)) : null;
           //
           if (cachedInstance) {
@@ -636,7 +638,7 @@ export async function initDatabase<TModels>(
         // model
         //   .findOne(queryOptions)
         //   .then(row => {
-        //     connection.redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
+        //     redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
         //   })
         //   .catch(logger.error);
         //
@@ -654,7 +656,7 @@ export async function initDatabase<TModels>(
       }
       //
       if (cachePolicy !== 'no-cache') {
-        connection.redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
+        redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
       }
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
@@ -676,7 +678,7 @@ export async function initDatabase<TModels>(
         return null;
       }
       const cachePolicy =
-        opts?.cacheKey && connection.redis && !resolveInfo
+        opts?.cacheKey && redis && !resolveInfo
           ? get(opts, 'cachePolicy', 'cache-first')
           : 'no-cache';
       //
@@ -689,7 +691,7 @@ export async function initDatabase<TModels>(
       if (cachePolicy !== 'no-cache') {
         try {
           //
-          const cached = await connection.redis.getAsync(cacheKey);
+          const cached = await redis.getAsync(cacheKey);
           cachedInstance = cached ? model.build(parse(cached)) : null;
           //
           if (cachedInstance) {
@@ -709,7 +711,7 @@ export async function initDatabase<TModels>(
         // model
         //   .findByPk(id, queryOptions)
         //   .then(row => {
-        //     connection.redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
+        //     redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
         //   })
         //   .catch(logger.error);
         //
@@ -729,7 +731,7 @@ export async function initDatabase<TModels>(
       }
       //
       if (cachePolicy !== 'no-cache') {
-        connection.redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
+        redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
       }
       if (dataloaderContext && dataloaderContext[EXPECTED_OPTIONS_KEY]) {
         //
