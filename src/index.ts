@@ -126,8 +126,7 @@ export type DatabaseHelpers = {
 };
 
 export type DatabaseConnection = Sequelize & {
-  // @ts-ignore
-  Op: Op;
+  is: typeof Op;
   helpers: DatabaseHelpers;
   QueryTypes?: QueryTypes;
   fn?: (functionName: string, columnName: string, args?: string) => string;
