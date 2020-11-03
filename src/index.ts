@@ -334,12 +334,11 @@ export function createConnection(options: DatabaseConnectionOptions): DatabaseCo
   return connection as DatabaseConnection;
 }
 
-export default async function initDatabase<TModels>(
+export async function initDatabase<TModels>(
+  c: DatabaseConnection & { models: TModels },
   models: TModels,
-  options: DatabaseConnectionOptions,
 ): Promise<DatabaseConnection & { models: TModels }> {
-  // Create db connection instance
-  const connection = createConnection(options) as DatabaseConnection & { models: TModels };
+  const connection = c;
   // @ts-ignore
   connection.models = models;
 
