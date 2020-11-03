@@ -338,6 +338,7 @@ export async function initDatabase<TModels>(
   c: DatabaseConnection,
   options?: { models: TModels; migrationsPath?: string; sync: boolean },
 ): Promise<DatabaseConnection & { models: TModels }> {
+  const { models, sync, migrationsPath } = options || {};
   const connection = c;
   // @ts-ignore
   connection.models = models;
@@ -755,7 +756,6 @@ export async function initDatabase<TModels>(
     },
   };
 
-  const { sync, migrationsPath } = options || {};
   if (sync) {
     // Run db-sync only on the first node in pm2's cluster
     if (
