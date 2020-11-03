@@ -334,11 +334,10 @@ export function createConnection(options: DatabaseConnectionOptions): DatabaseCo
   return connection as DatabaseConnection;
 }
 
-export async function initDatabase<TModels>(
-  c: DatabaseConnection & { models: TModels },
-  models: TModels,
-  options?: { sync: boolean },
-): Promise<DatabaseConnection & { models: TModels }> {
+export async function initDatabase<TConnection, TModels>(
+  c: DatabaseConnection,
+  options?: { models: TModels; migrationsPath?: string; sync: boolean },
+): Promise<TConnection & { models: TModels }> {
   const connection = c;
   // @ts-ignore
   connection.models = models;
@@ -756,14 +755,17 @@ export async function initDatabase<TModels>(
     },
   };
 
-  if (options?.sync) {
+  const { sync, migrationsPath } = options || {};
+  if (sync) {
     // Run db-sync only on the first node in pm2's cluster
     if (
       typeof process.env.NODE_APP_INSTANCE === 'undefined' ||
       process.env.NODE_APP_INSTANCE === '0'
     ) {
       // Sync Sequelize models with Database
-      await runMigrations(connection, 'up');
+      if (migrationsPath) {
+        await runMigrations(connection, 'up', migrationsPath);
+      }
       //
       logger.info('Database migrations completed successfully');
 
@@ -772,6 +774,7 @@ export async function initDatabase<TModels>(
     }
   }
 
+  // @ts-ignore
   return connection;
 }
 

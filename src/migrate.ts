@@ -68,11 +68,15 @@ function genUmzugConfig(params: GetUmzugConfigParams): UmzugOptions {
   };
 }
 
-export default async function runMigrations(sequelizeInstance: Sequelize, cmd: MigrateCommand) {
+export default async function runMigrations(
+  sequelizeInstance: Sequelize,
+  cmd: MigrateCommand,
+  path: string,
+) {
   const migrator = new Migrator(
     genUmzugConfig({
       sequelize: sequelizeInstance,
-      path: resolvePath(__dirname, 'migrations'),
+      path: resolvePath(path, 'migrations'),
     }),
   );
   const seedPath = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
@@ -80,7 +84,7 @@ export default async function runMigrations(sequelizeInstance: Sequelize, cmd: M
     genUmzugConfig({
       sequelize: sequelizeInstance,
       modelName: 'SequelizeSeeds',
-      path: resolvePath(__dirname, 'seeds', seedPath),
+      path: resolvePath(path, 'seeds', seedPath),
     }),
   );
 
