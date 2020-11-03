@@ -87,7 +87,7 @@ export type GetQueryTreeParams = {
   relationKeysMap?: Map<string, string>;
 };
 
-type PaginationOptions = unknown;
+type PaginationOptions = { [k: string]: any };
 
 export type DatabaseHelpers = {
   wrapInTransaction: (
