@@ -334,10 +334,10 @@ export function createConnection(options: DatabaseConnectionOptions): DatabaseCo
   return connection as DatabaseConnection;
 }
 
-export async function initDatabase<TConnection, TModels>(
+export async function initDatabase<TModels>(
   c: DatabaseConnection,
   options?: { models: TModels; migrationsPath?: string; sync: boolean },
-): Promise<TConnection & { models: TModels }> {
+): Promise<DatabaseConnection & { models: TModels }> {
   const connection = c;
   // @ts-ignore
   connection.models = models;
