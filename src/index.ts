@@ -784,4 +784,4 @@ export default async function initDatabase<TModels>(
   return connection;
 }
 
-export { getModelName, getTableName } from './helpers';
+export * from './helpers';
