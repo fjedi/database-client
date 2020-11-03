@@ -763,7 +763,7 @@ export default async function initDatabase<TModels>(
     },
   };
 
-  if (sync) {
+  if (options.sync) {
     // Run db-sync only on the first node in pm2's cluster
     if (
       typeof process.env.NODE_APP_INSTANCE === 'undefined' ||
