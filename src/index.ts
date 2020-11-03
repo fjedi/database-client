@@ -23,7 +23,7 @@ import { redis, RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
 
 //
-import { getModelName, getTableName } from './helpers';
+import { getModelName, getTableName, filterByField } from './helpers';
 
 import runMigrations from './migrate';
 
@@ -98,6 +98,7 @@ export type DatabaseHelpers = {
   getListQueryOptions(query: any, defaults?: any): PaginationOptions;
   getModelName: typeof getModelName;
   getTableName: typeof getTableName;
+  filterByField: typeof filterByField;
   getQueryTree: (p: GetQueryTreeParams) => any;
   createDatabaseContext: (p: any) => any;
   findAndCountAll: (
@@ -356,6 +357,7 @@ export async function initDatabase<TModels>(
     //
     getModelName,
     getTableName,
+    filterByField,
     //
     getQueryTree(params: GetQueryTreeParams) {
       const { fields, databaseModel, includes = [], relationKeysMap } = params;
