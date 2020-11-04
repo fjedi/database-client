@@ -24,7 +24,7 @@ import { DefaultError } from '@fjedi/errors';
 //
 import runMigrations from './migrate';
 //
-import { getModelName, getTableName, filterByField } from './helpers';
+import { getModelName, getTableName, filterByField, afterCommitHook } from './helpers';
 
 export * from './helpers';
 
@@ -95,7 +95,7 @@ export type DatabaseHelpers = {
     action: (tx: DatabaseTransaction) => Promise<any>,
     opts?: DatabaseTransactionProps,
   ) => Promise<any>;
-  afterCommitHook: (tx: DatabaseTransaction, hookFn: () => any) => void;
+  afterCommitHook: typeof afterCommitHook;
   getListQueryOptions(query: any, defaults?: any): PaginationOptions;
   getModelName: typeof getModelName;
   getTableName: typeof getTableName;
@@ -401,35 +401,7 @@ export async function initDatabase<TModels>(
         [EXPECTED_OPTIONS_KEY]: createContext(connection),
       };
     },
-    afterCommitHook(transaction, hookFn) {
-      if (typeof hookFn !== 'function') return;
-      if (!transaction) {
-        hookFn();
-        return;
-      }
-
-      // @ts-ignore
-      if (!transaction[transHooks]) {
-        // @ts-ignore
-        // eslint-disable-next-line no-param-reassign
-        transaction[transHooks] = [];
-
-        const origFn = transaction.commit;
-        // eslint-disable-next-line no-param-reassign
-        transaction.commit = function commitTransaction(...args) {
-          const commitPromise = origFn.call(this, ...args);
-          // @ts-ignore
-          const runHooks = (v) => transaction[transHooks].forEach((fn) => fn()) && v;
-          //
-          return typeof (commitPromise && commitPromise.then) === 'function'
-            ? commitPromise.then(runHooks)
-            : runHooks(commitPromise);
-        };
-      }
-
-      // @ts-ignore
-      transaction[transHooks].push(hookFn);
-    },
+    afterCommitHook,
     //
     async wrapInTransaction(
       action: (transaction: Transaction) => Promise<any>,
@@ -836,16 +808,12 @@ export type DatabaseHookEvents =
   | 'beforeDisconnect'
   | 'afterDisconnect';
 
-export function initModelHook<TConnection>(
-  db: DatabaseConnection & TConnection,
-  modelName: keyof DatabaseModels,
+export function initModelHook<TModels>(
+  models: DatabaseModels & TModels,
+  modelName: keyof DatabaseModels & keyof TModels,
   event: DatabaseHookEvents,
   options: DatabaseHookOptions,
 ): void {
-  const {
-    helpers: { afterCommitHook },
-    models,
-  } = db;
   const { beforeCommit, afterCommit } = options;
 
   //

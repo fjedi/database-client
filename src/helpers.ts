@@ -1,4 +1,4 @@
-import { DataTypes, Sequelize, Model, WhereOptions, Op } from 'sequelize';
+import { DataTypes, Sequelize, Model, WhereOptions, Op, Transaction } from 'sequelize';
 import snakeCase from 'lodash/snakeCase';
 import camelCase from 'lodash/camelCase';
 import upperFirst from 'lodash/upperFirst';
@@ -122,4 +122,34 @@ export function filterByField(
       }
     }
   }
+}
+
+export function afterCommitHook(transaction: Transaction, hookFn: () => any): void {
+  if (typeof hookFn !== 'function') return;
+  if (!transaction) {
+    hookFn();
+    return;
+  }
+
+  // @ts-ignore
+  if (!transaction[transHooks]) {
+    // @ts-ignore
+    // eslint-disable-next-line no-param-reassign
+    transaction[transHooks] = [];
+
+    const origFn = transaction.commit;
+    // eslint-disable-next-line no-param-reassign
+    transaction.commit = function commitTransaction(...args) {
+      const commitPromise = origFn.call(this, ...args);
+      // @ts-ignore
+      const runHooks = (v) => transaction[transHooks].forEach((fn) => fn()) && v;
+      //
+      return typeof (commitPromise && commitPromise.then) === 'function'
+        ? commitPromise.then(runHooks)
+        : runHooks(commitPromise);
+    };
+  }
+
+  // @ts-ignore
+  transaction[transHooks].push(hookFn);
 }
