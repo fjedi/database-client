@@ -61,6 +61,9 @@ export type DatabaseTransactionProps = {
 export type SortDirection = 'ASC' | 'DESC';
 export type DatabaseWhere = WhereOptions;
 export type DatabaseInclude = IncludeOptions;
+export type DatabaseModels = {
+  [k: string]: ModelCtor<Model>;
+};
 
 export interface DatabaseQueryOptions extends QueryOptions {
   transaction?: DatabaseTransaction;
@@ -79,7 +82,7 @@ export interface DatabaseTreeQueryOptions extends DatabaseQueryOptions {
   relationKeysMap?: Map<string, string>;
 }
 
-export type GetQueryTreeParams<TModels> = {
+export type GetQueryTreeParams<TModels extends DatabaseModels> = {
   fields?: string[];
   databaseModel: TModels[keyof TModels];
   includes?: IncludeOptions[];
@@ -87,7 +90,7 @@ export type GetQueryTreeParams<TModels> = {
 };
 
 //
-export type DatabaseHelpers<TModels> = {
+export type DatabaseHelpers<TModels extends DatabaseModels> = {
   wrapInTransaction: (
     action: (tx: DatabaseTransaction) => Promise<any>,
     opts?: DatabaseTransactionProps,
@@ -126,7 +129,7 @@ export type DatabaseHelpers<TModels> = {
 
 type PaginationOptions = { [k: string]: any };
 
-export type DatabaseConnection<TModels> = Sequelize & {
+export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   fieldValue: typeof Op;
   QueryTypes?: QueryTypes;
   fn?: (functionName: string, columnName: string, args?: string) => string;
@@ -137,9 +140,9 @@ export type DatabaseConnection<TModels> = Sequelize & {
   redis: RedisClient;
 };
 
-type DatabaseList<TModels> = TModels[keyof TModels][];
+type DatabaseList<TModels extends DatabaseModels> = TModels[keyof TModels][];
 
-type DatabaseListWithPagination<TModels> = {
+type DatabaseListWithPagination<TModels extends DatabaseModels> = {
   rows: DatabaseList<TModels>;
   count: number;
 };
@@ -206,7 +209,7 @@ function shimCachedInstance(instance: any) {
   );
 }
 
-function queryBuilder<TModels>(
+function queryBuilder<TModels extends DatabaseModels>(
   connection: DatabaseConnection<TModels>,
   modelName: keyof TModels,
   opts?: DatabaseTreeQueryOptions,
@@ -342,7 +345,7 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
   return connection as Sequelize;
 }
 
-export async function initDatabase<TModels>(
+export async function initDatabase<TModels extends DatabaseModels>(
   c: Sequelize,
   options: { models: TModels; migrationsPath?: string; sync: boolean },
 ): Promise<DatabaseConnection<TModels>> {
@@ -445,8 +448,8 @@ export async function initDatabase<TModels>(
       }
     },
     async findOrCreate(modelName, where, defaults, opts) {
-      // @ts-ignore
-      const model = models[modelName] as ModelCtor<Model>;
+      //
+      const model = models[modelName];
       const exist = (await model.findOne({
         where,
         ...opts,
@@ -471,8 +474,8 @@ export async function initDatabase<TModels>(
         relationKeysMap,
         ...queryOptions
       } = opts || {};
-      // @ts-ignore
-      const model = models[modelName] as ModelCtor<Model>;
+      //
+      const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAndCountAll_${stringify(queryOptions)}`;
@@ -511,9 +514,7 @@ export async function initDatabase<TModels>(
       //     .catch(logger.error);
       // }
 
-      const res =
-        // @ts-ignore
-        cachedInstance || ((await model.findAndCountAll(p)) as DatabaseListWithPagination<TModels>);
+      const res = cachedInstance || (await model.findAndCountAll(p));
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
@@ -524,7 +525,7 @@ export async function initDatabase<TModels>(
         redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       }
       //
-      return res;
+      return res as DatabaseListWithPagination<TModels>;
     },
     //
     async findAll(modelName, opts) {
@@ -539,8 +540,8 @@ export async function initDatabase<TModels>(
         relationKeysMap,
         ...queryOptions
       } = opts || {};
-      // @ts-ignore
-      const model = models[modelName] as ModelCtor<Model>;
+      //
+      const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAll_${stringify(queryOptions)}`;
@@ -577,8 +578,8 @@ export async function initDatabase<TModels>(
       //     })
       //     .catch(logger.error);
       // }
-      // @ts-ignore
-      const rows = cachedInstance || ((await model.findAll(p)) as DatabaseList<TModels>);
+      //
+      const rows = cachedInstance || (await model.findAll(p));
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
@@ -589,7 +590,7 @@ export async function initDatabase<TModels>(
         redis.set(cacheKey, stringify(rows), 'PX', cachePeriod);
       }
       //
-      return rows;
+      return rows as DatabaseList<TModels>;
     },
     async findOne(modelName, opts) {
       const { cachePeriod = 30000, throwErrorIfNotFound = true, context, resolveInfo, raw } =
@@ -598,8 +599,8 @@ export async function initDatabase<TModels>(
         opts?.cacheKey && redis && !resolveInfo
           ? get(opts, 'cachePolicy', 'cache-first')
           : 'no-cache';
-      // @ts-ignore
-      const model = models[modelName] as ModelCtor<Model>;
+      //
+      const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findOne_${opts?.cacheKey}`;
@@ -639,8 +640,8 @@ export async function initDatabase<TModels>(
       }
       //
       const p = queryBuilder(connection, modelName, opts);
-      // @ts-ignore
-      const row = (await model.findOne(p)) as TModels[keyof TModels];
+      //
+      const row = await model.findOne(p);
       if (!row) {
         if (throwErrorIfNotFound) {
           throw new DefaultError(`${model.name} couldn't be found in database`, { status: 404 });
@@ -656,8 +657,8 @@ export async function initDatabase<TModels>(
       if (!raw && !limitedFields && dataloaderContext) {
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(row);
       }
-      //
-      return row;
+      // @ts-ignore
+      return row as TModels[keyof TModels];
     },
     //
     async dbInstanceById(modelName, id, opts) {
@@ -676,8 +677,8 @@ export async function initDatabase<TModels>(
           : 'no-cache';
       //
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
-      // @ts-ignore
-      const model = models[modelName] as ModelCtor<Model>;
+      //
+      const model = models[modelName];
       //
       const cacheKey = `${modelName}_findByPk_${id}`;
       let cachedInstance: TModels[keyof TModels] | null = null;
@@ -717,8 +718,8 @@ export async function initDatabase<TModels>(
 
       //
       const p = queryBuilder(connection, modelName, opts);
-      // @ts-ignore
-      const row = (await model.findByPk(id, p)) as TModels[keyof TModels];
+      //
+      const row = await model.findByPk(id, p);
       if (!row) {
         if (throwErrorIfNotFound) {
           throw new DefaultError(`${model.name} with ID: ${id} couldn't be found in database`, {
@@ -735,8 +736,8 @@ export async function initDatabase<TModels>(
         //
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(row);
       }
-      //
-      return row;
+      // @ts-ignore
+      return row as TModels[keyof TModels];
     },
     getListQueryOptions(props, defaults = {}) {
       //
@@ -832,15 +833,15 @@ export type DatabaseHookEvents =
   | 'beforeDisconnect'
   | 'afterDisconnect';
 
-export function initModelHook<TModels>(
+export function initModelHook<TModels extends DatabaseModels>(
   models: TModels,
   modelName: keyof TModels,
   event: DatabaseHookEvents,
   options: DatabaseHookOptions,
 ): void {
   const { beforeCommit, afterCommit } = options;
-  // @ts-ignore
-  const model = models[modelName] as ModelCtor<Model>;
+  //
+  const model = models[modelName];
   //
   model.addHook(
     event,
