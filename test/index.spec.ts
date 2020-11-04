@@ -32,26 +32,26 @@ describe('Test database-client', function () {
   beforeAll(async () => {
     console.log('Emit beforeAll test-hook');
 
-    const connection = createConnection(options);
-    // @ts-ignore
-    const db = await initDatabase<Models>(connection, {
-      models,
-    });
+    // const connection = createConnection(options);
+    // // @ts-ignore
+    // const db = await initDatabase<Models>(connection, {
+    //   models,
+    // });
 
-    const modelName: 'User' = 'User';
-    const userById = await db.helpers.dbInstanceById<typeof modelName>(modelName, 'test-user-id');
-    const userOne = await db.helpers.findOne<typeof modelName>(modelName, {
-      where: { id: 'test-user-id' },
-    });
-    const userAll = await db.helpers.findAll<typeof modelName>(modelName, {
-      where: { name: 'test-user-id' },
-    });
-    userAll.forEach((user) => {
-      console.log(user.firstName);
-    });
+    // const modelName: 'User' = 'User';
+    // const userById = await db.helpers.dbInstanceById<typeof modelName>(modelName, 'test-user-id');
+    // const userOne = await db.helpers.findOne<typeof modelName>(modelName, {
+    //   where: { id: 'test-user-id' },
+    // });
+    // const userAll = await db.helpers.findAll<typeof modelName>(modelName, {
+    //   where: { name: 'test-user-id' },
+    // });
+    // userAll.forEach((user) => {
+    //   console.log(user.firstName);
+    // });
 
-    console.log(userById?.firstName);
-    console.log(userOne?.firstName);
+    // console.log(userById?.firstName);
+    // console.log(userOne?.firstName);
   });
 
   afterAll(async () => {
