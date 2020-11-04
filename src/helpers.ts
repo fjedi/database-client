@@ -124,6 +124,9 @@ export function filterByField(
   }
 }
 
+// Used as an 'invisible' property on transaction objects,
+// used to stored "after*" hook functions that should only run if the transaction actually commits successfully
+const transHooks = Symbol('afterCommitHooks');
 export function afterCommitHook(transaction: Transaction, hookFn: () => any): void {
   if (typeof hookFn !== 'function') return;
   if (!transaction) {

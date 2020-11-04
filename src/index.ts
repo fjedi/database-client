@@ -12,6 +12,7 @@ import {
   Options,
   DataTypes,
   Model,
+  ModelCtor,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
@@ -57,7 +58,7 @@ export type DatabaseTransactionProps = {
   autocommit?: boolean;
 };
 export type DatabaseModels = {
-  [k: string]: Model;
+  [k: string]: ModelCtor<any>;
 };
 
 export type SortDirection = 'ASC' | 'DESC';
@@ -81,16 +82,15 @@ export interface DatabaseTreeQueryOptions extends DatabaseQueryOptions {
   relationKeysMap?: Map<string, string>;
 }
 
-export type GetQueryTreeParams = {
+export type GetQueryTreeParams<TModels> = {
   fields?: string[];
-  databaseModel: DatabaseModels[keyof DatabaseModels];
+  databaseModel: TModels[keyof TModels];
   includes?: IncludeOptions[];
   relationKeysMap?: Map<string, string>;
 };
 
-type PaginationOptions = { [k: string]: any };
-
-export type DatabaseHelpers = {
+//
+export type DatabaseHelpers<TModels extends DatabaseModels> = {
   wrapInTransaction: (
     action: (tx: DatabaseTransaction) => Promise<any>,
     opts?: DatabaseTransactionProps,
@@ -100,41 +100,43 @@ export type DatabaseHelpers = {
   getModelName: typeof getModelName;
   getTableName: typeof getTableName;
   filterByField: typeof filterByField;
-  getQueryTree: (p: GetQueryTreeParams) => any;
+  getQueryTree: (p: GetQueryTreeParams<TModels>) => any;
   createDatabaseContext: (p: any) => any;
   findAndCountAll: (
-    modelName: keyof DatabaseModels,
+    modelName: keyof TModels,
     o?: DatabaseTreeQueryOptions,
-  ) => Promise<{ rows: DatabaseModels[keyof DatabaseModels][]; count: number }>;
+  ) => Promise<{ rows: TModels[keyof TModels][]; count: number }>;
   findAll: (
-    modelName: keyof DatabaseModels,
+    modelName: keyof TModels,
     o?: DatabaseTreeQueryOptions,
-  ) => Promise<DatabaseModels[keyof DatabaseModels][]>;
+  ) => Promise<TModels[keyof TModels][]>;
   findOne: (
-    modelName: keyof DatabaseModels,
+    modelName: keyof TModels,
     o?: DatabaseTreeQueryOptions,
-  ) => Promise<DatabaseModels[keyof DatabaseModels] | null>;
+  ) => Promise<TModels[keyof TModels] | null>;
   findOrCreate: (
-    modelName: keyof DatabaseModels,
-    where: any,
-    defaults?: any,
+    modelName: keyof TModels,
+    where: DatabaseWhere,
+    defaults: { [k: string]: any },
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<[DatabaseModels[keyof DatabaseModels], boolean]>;
+  ) => Promise<[TModels[keyof TModels], boolean]>;
   dbInstanceById: (
-    modelName: keyof DatabaseModels,
+    modelName: keyof TModels,
     id: string,
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<DatabaseModels[keyof DatabaseModels] | null>;
+  ) => Promise<TModels[keyof TModels] | null>;
 };
 
-export type DatabaseConnection = Sequelize & {
+type PaginationOptions = { [k: string]: any };
+
+export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   fieldValue: typeof Op;
-  helpers: DatabaseHelpers;
   QueryTypes?: QueryTypes;
   fn?: (functionName: string, columnName: string, args?: string) => string;
   col?: (v: string) => string;
   literal?: (v: string) => string;
-  models: DatabaseModels;
+  models: TModels;
+  helpers: DatabaseHelpers<TModels>;
   redis: RedisClient;
 };
 
@@ -200,9 +202,9 @@ function shimCachedInstance(instance: any) {
   );
 }
 
-function queryBuilder(
-  connection: DatabaseConnection,
-  modelName: keyof DatabaseModels,
+function queryBuilder<TModels extends DatabaseModels>(
+  connection: DatabaseConnection<TModels>,
+  modelName: keyof TModels,
   opts?: DatabaseTreeQueryOptions,
 ) {
   const {
@@ -232,7 +234,7 @@ function queryBuilder(
       includes: bypassParams.include,
       relationKeysMap,
     });
-    //
+    // @ts-ignore
     const indexes: Array<{ fields: string[] }> = get(model, '_indexes', []);
     const indexFields: string[] = flatten(indexes.map((i) => i.fields));
     //
@@ -278,7 +280,7 @@ function queryBuilder(
   return queryParams;
 }
 
-export function createConnection(options: DatabaseConnectionOptions): DatabaseConnection {
+export function createConnection(options: DatabaseConnectionOptions): Sequelize {
   const {
     engine = 'mysql',
     host = '127.0.0.1',
@@ -288,7 +290,6 @@ export function createConnection(options: DatabaseConnectionOptions): DatabaseCo
     password,
     timezone = '+00:00',
     logging,
-    sync = false,
     maxConnections,
     minConnections,
   } = options;
@@ -334,15 +335,20 @@ export function createConnection(options: DatabaseConnectionOptions): DatabaseCo
   // @ts-ignore
   connection.fieldValue = Op;
 
-  return connection as DatabaseConnection;
+  return connection as Sequelize;
 }
 
-export async function initDatabase<TModels>(
-  c: DatabaseConnection,
-  options?: { models: TModels; migrationsPath?: string; sync: boolean },
-): Promise<DatabaseConnection & { models: TModels }> {
-  const { models, sync, migrationsPath } = options || {};
-  const connection = c;
+export async function initDatabase<TModels extends DatabaseModels>(
+  c: Sequelize,
+  options: { models: TModels; migrationsPath?: string; sync: boolean },
+): Promise<DatabaseConnection<TModels>> {
+  const { sync, migrationsPath, models } = options || {};
+
+  //
+  const connection = c as DatabaseConnection<TModels>;
+  if (!models) {
+    throw new Error('Invalid "models" passed to "initDatabase" function');
+  }
   // @ts-ignore
   connection.models = models;
 
@@ -350,17 +356,14 @@ export async function initDatabase<TModels>(
   await connection.authenticate();
 
   logger.info('DB Connection has been established successfully');
-
-  // Used as an 'invisible' property on transaction objects,
-  // used to stored "after*" hook functions that should only run if the transaction actually commits successfully
-  const transHooks = Symbol('afterCommitHooks');
+  //
   connection.helpers = {
     //
     getModelName,
     getTableName,
     filterByField,
     //
-    getQueryTree(params: GetQueryTreeParams) {
+    getQueryTree(params: GetQueryTreeParams<TModels>) {
       const { fields, databaseModel, includes = [], relationKeysMap } = params;
       (fields || []).forEach((i) => {
         const field = i.split('.');
@@ -437,8 +440,8 @@ export async function initDatabase<TModels>(
         throw error;
       }
     },
-    async findOrCreate(modelName, where, defaults = {}, opts) {
-      const model = connection.models[modelName];
+    async findOrCreate(modelName, where, defaults, opts) {
+      const model = models[modelName];
       const exist = await model.findOne({
         where,
         ...opts,
@@ -462,7 +465,7 @@ export async function initDatabase<TModels>(
         ...queryOptions
       } = opts || {};
       //
-      const model = connection.models[modelName];
+      const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAndCountAll_${stringify(queryOptions)}`;
@@ -490,7 +493,7 @@ export async function initDatabase<TModels>(
         }
       }
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = <TModels>queryBuilder(connection, modelName, opts);
       // if (cachedInstance && cachePolicy === 'cache-first') {
       //   model
       //     .findAndCountAll(p)
@@ -527,7 +530,7 @@ export async function initDatabase<TModels>(
         ...queryOptions
       } = opts || {};
       //
-      const model = connection.models[modelName];
+      const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAll_${stringify(queryOptions)}`;
@@ -551,7 +554,7 @@ export async function initDatabase<TModels>(
         }
       }
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = <TModels>queryBuilder(connection, modelName, opts);
       //
       // if (cachedInstance && cachePolicy === 'cache-first') {
       //   model
@@ -583,7 +586,7 @@ export async function initDatabase<TModels>(
           ? get(opts, 'cachePolicy', 'cache-first')
           : 'no-cache';
       //
-      const model = connection.models[modelName];
+      const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findOne_${opts?.cacheKey}`;
@@ -619,7 +622,7 @@ export async function initDatabase<TModels>(
         return cachedInstance;
       }
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = <TModels>queryBuilder(connection, modelName, opts);
       //
       const row = await model.findOne(p);
       if (!row) {
@@ -658,7 +661,7 @@ export async function initDatabase<TModels>(
       //
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
-      const model = connection.models[modelName];
+      const model = models[modelName];
       //
       const cacheKey = `${modelName}_findByPk_${id}`;
       let cachedInstance;
@@ -666,6 +669,7 @@ export async function initDatabase<TModels>(
         try {
           //
           const cached = await redis.getAsync(cacheKey);
+          //
           cachedInstance = cached ? model.build(parse(cached)) : null;
           //
           if (cachedInstance) {
@@ -693,7 +697,8 @@ export async function initDatabase<TModels>(
       }
 
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = <TModels>queryBuilder(connection, modelName, opts);
+      //
       const row = await model.findByPk(id, p);
       if (!row) {
         if (throwErrorIfNotFound) {
@@ -808,16 +813,16 @@ export type DatabaseHookEvents =
   | 'beforeDisconnect'
   | 'afterDisconnect';
 
-export function initModelHook<TModels>(
-  models: DatabaseModels & TModels,
-  modelName: keyof DatabaseModels & keyof TModels,
+export function initModelHook<TModels extends DatabaseModels>(
+  models: TModels,
+  modelName: keyof TModels,
   event: DatabaseHookEvents,
   options: DatabaseHookOptions,
 ): void {
   const { beforeCommit, afterCommit } = options;
-
+  const model = models[modelName];
   //
-  models[modelName].addHook(
+  model.addHook(
     event,
     `${modelName}${capitalize(event)}`,
     async (instance: DatabaseHookModel, queryProps: any) => {
