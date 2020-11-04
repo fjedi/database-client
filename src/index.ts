@@ -79,7 +79,7 @@ export interface DatabaseQueryOptions extends QueryOptions {
   where?: WhereOptions;
   include?: IncludeOptions[];
   raw?: boolean;
-  context?: any;
+  context?: unknown;
 }
 export interface DatabaseTreeQueryOptions extends DatabaseQueryOptions {
   cachePolicy?: 'no-cache' | 'cache-first' | 'cache-only';
