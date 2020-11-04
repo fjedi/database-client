@@ -13,6 +13,7 @@ import {
   DataTypes,
   Model,
   ModelCtor,
+  BuildOptions,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
@@ -30,7 +31,10 @@ import { getModelName, getTableName, filterByField, afterCommitHook } from './he
 export * from './helpers';
 
 export interface ModelInstance<T> extends Model {
-  new (...args: any[]): T;
+  publicFields: Set<string>;
+  privateFields: Set<string>;
+  associate: (models: DatabaseModels) => void;
+  new (values?: unknown, options?: BuildOptions): T;
 }
 
 export type DatabaseConnectionOptions = {
