@@ -1,4 +1,4 @@
-import { DataTypes, Sequelize, Model, ModelCtor, WhereOptions, Op, Transaction } from 'sequelize';
+import { WhereOptions, Op, Transaction } from 'sequelize';
 import snakeCase from 'lodash/snakeCase';
 import camelCase from 'lodash/camelCase';
 import upperFirst from 'lodash/upperFirst';
@@ -20,33 +20,6 @@ export function getTableName(key: string, prefix?: string): string {
     return dbTables[key];
   }
   return `${prefix || ''}${snakeCase(key)}`;
-}
-
-type Models = { [k: string]: ModelCtor<Model> };
-
-export function getModels(dbConnection: Sequelize, s: any): Models {
-  const models = {} as Models;
-
-  Object.keys(s).forEach((schemaKey) => {
-    // @ts-ignore
-    models[schemaKey] = s[schemaKey](
-      dbConnection,
-      DataTypes,
-      getModelName(schemaKey),
-      getTableName(schemaKey),
-    );
-  });
-
-  // Creating associations between models
-  Object.keys(models).forEach((modelName: string) => {
-    // @ts-ignore
-    if (models[modelName].associate) {
-      // @ts-ignore
-      models[modelName].associate(models);
-    }
-  });
-
-  return models;
 }
 
 export type CompareType = 'like' | 'notLike' | 'in' | 'notIn' | 'eq' | 'ne';

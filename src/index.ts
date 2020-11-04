@@ -110,29 +110,29 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   filterByField: typeof filterByField;
   getQueryTree: (p: GetQueryTreeParams<TModels>) => any;
   createDatabaseContext: (p: any) => any;
-  findAndCountAll: (
+  findAndCountAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     o?: DatabaseTreeQueryOptions,
-  ) => Promise<DatabaseListWithPagination<TModels>>;
-  findAll: (
+  ) => Promise<DatabaseListWithPagination<TModels, TModelName>>;
+  findAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     o?: DatabaseTreeQueryOptions,
-  ) => Promise<DatabaseList<TModels>>;
-  findOne: (
+  ) => Promise<DatabaseList<TModels, TModelName>>;
+  findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     o?: DatabaseTreeQueryOptions,
-  ) => Promise<ModelInstance<TModels[keyof TModels]> | null>;
-  findOrCreate: (
+  ) => Promise<TModels[TModelName] | null>;
+  findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     where: DatabaseWhere,
     defaults: { [k: string]: any },
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<[ModelInstance<TModels[keyof TModels]>, boolean]>;
+  ) => Promise<[TModels[TModelName], boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     id: string,
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<ModelInstance<TModels[TModelName]> | null>;
+  ) => Promise<TModels[TModelName] | null>;
 };
 
 type PaginationOptions = { [k: string]: any };
@@ -148,10 +148,16 @@ export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   redis: RedisClient;
 };
 
-export type DatabaseList<TModels extends DatabaseModels> = ModelInstance<TModels[keyof TModels]>[];
+export type DatabaseList<
+  TModels extends DatabaseModels,
+  TModelName extends keyof TModels
+> = TModels[TModelName][];
 
-export type DatabaseListWithPagination<TModels extends DatabaseModels> = {
-  rows: DatabaseList<TModels>;
+export type DatabaseListWithPagination<
+  TModels extends DatabaseModels,
+  TModelName extends keyof TModels
+> = {
+  rows: DatabaseList<TModels, TModelName>;
   count: number;
 };
 
@@ -355,7 +361,7 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
 
 export async function initDatabase<TModels extends DatabaseModels>(
   c: Sequelize,
-  options: { models: TModels; migrationsPath?: string; sync: boolean },
+  options: { models: TModels; migrationsPath?: string; sync?: boolean },
 ): Promise<DatabaseConnection<TModels>> {
   const { sync, migrationsPath, models } = options || {};
 
@@ -364,6 +370,19 @@ export async function initDatabase<TModels extends DatabaseModels>(
   if (!models) {
     throw new Error('Invalid "models" passed to "initDatabase" function');
   }
+  //
+  Object.keys(models).forEach((modelName: string) => {
+    // @ts-ignore
+    if (models[modelName].initModel) {
+      // @ts-ignore
+      models[modelName].initModel(connection, getTableName(modelName));
+    }
+    // @ts-ignore
+    if (models[modelName].associate) {
+      // @ts-ignore
+      models[modelName].associate(models);
+    }
+  });
   // @ts-ignore
   connection.models = models;
 
@@ -455,22 +474,30 @@ export async function initDatabase<TModels extends DatabaseModels>(
         throw error;
       }
     },
-    async findOrCreate(modelName, where, defaults, opts) {
+    async findOrCreate<TModelName extends keyof TModels>(
+      modelName: keyof TModels,
+      where: DatabaseWhere,
+      defaults: { [k: string]: any },
+      opts?: DatabaseQueryOptions,
+    ) {
       //
       const model = models[modelName];
       const exist = (await model.findOne({
         where,
         ...opts,
-      })) as ModelInstance<TModels[keyof TModels]> | null;
+      })) as TModels[TModelName] | null;
       if (exist) {
         return [exist, false];
       }
-      //
-      const res = (await model.create(defaults, opts)) as ModelInstance<TModels[keyof TModels]>;
+      // @ts-ignore
+      const res = (await model.create(defaults, opts)) as TModels[TModelName];
       return [res, true];
     },
     //
-    async findAndCountAll(modelName, opts) {
+    async findAndCountAll<TModelName extends keyof TModels>(
+      modelName: keyof TModels,
+      opts?: DatabaseTreeQueryOptions,
+    ) {
       //
       const {
         cachePolicy = 'no-cache',
@@ -487,7 +514,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAndCountAll_${stringify(queryOptions)}`;
-      let cachedInstance: DatabaseListWithPagination<TModels> | null = null;
+      let cachedInstance: DatabaseListWithPagination<TModels, TModelName> | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -499,7 +526,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
             cachedInstance = {
               count,
               rows: await mapPromise(rows, (r: any) => model.build(r)),
-            } as DatabaseListWithPagination<TModels>;
+            } as DatabaseListWithPagination<TModels, TModelName>;
           } else {
             cachedInstance = null;
           }
@@ -533,10 +560,13 @@ export async function initDatabase<TModels extends DatabaseModels>(
         redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       }
       //
-      return res as DatabaseListWithPagination<TModels>;
+      return res as DatabaseListWithPagination<TModels, TModelName>;
     },
     //
-    async findAll(modelName, opts) {
+    async findAll<TModelName extends keyof TModels>(
+      modelName: keyof TModels,
+      opts?: DatabaseTreeQueryOptions,
+    ) {
       //
       const {
         cachePolicy = 'no-cache',
@@ -553,7 +583,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAll_${stringify(queryOptions)}`;
-      let cachedInstance: DatabaseList<TModels> | null = null;
+      let cachedInstance: DatabaseList<TModels, TModelName> | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -563,7 +593,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
             // @ts-ignore
             cachedInstance = (await mapPromise(parse(cached), (r: any) =>
               model.build(r),
-            )) as DatabaseList<TModels>;
+            )) as DatabaseList<TModels, TModelName>;
           } else {
             cachedInstance = null;
           }
@@ -598,9 +628,12 @@ export async function initDatabase<TModels extends DatabaseModels>(
         redis.set(cacheKey, stringify(rows), 'PX', cachePeriod);
       }
       //
-      return rows as DatabaseList<TModels>;
+      return rows as DatabaseList<TModels, TModelName>;
     },
-    async findOne(modelName, opts) {
+    async findOne<TModelName extends keyof TModels>(
+      modelName: keyof TModels,
+      opts?: DatabaseTreeQueryOptions,
+    ) {
       const { cachePeriod = 30000, throwErrorIfNotFound = true, context, resolveInfo, raw } =
         opts || {};
       const cachePolicy =
@@ -612,7 +645,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findOne_${opts?.cacheKey}`;
-      let cachedInstance: ModelInstance<TModels[keyof TModels]> | null = null;
+      let cachedInstance: TModels[TModelName] | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -646,8 +679,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
       }
       //
       const p = queryBuilder(connection, modelName, opts);
-      //
-      const row = (await model.findOne(p)) as ModelInstance<TModels[keyof TModels]>;
+      // @ts-ignore
+      const row = (await model.findOne(p)) as TModels[TModelName];
       if (!row) {
         if (throwErrorIfNotFound) {
           throw new DefaultError(`${model.name} couldn't be found in database`, { status: 404 });
@@ -691,7 +724,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const model = models[modelName];
       //
       const cacheKey = `${modelName}_findByPk_${id}`;
-      let cachedInstance: ModelInstance<TModels[TModelName]> | null = null;
+      let cachedInstance: TModels[TModelName] | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -725,8 +758,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
 
       //
       const p = queryBuilder(connection, modelName, opts);
-      //
-      const row = (await model.findByPk(id, p)) as ModelInstance<TModels[TModelName]>;
+      // @ts-ignore
+      const row = (await model.findByPk(id, p)) as TModels[TModelName];
       if (!row) {
         if (throwErrorIfNotFound) {
           throw new DefaultError(`${model.name} with ID: ${id} couldn't be found in database`, {
