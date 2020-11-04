@@ -1,4 +1,4 @@
-import { get, uniq, flatten } from 'lodash';
+import { get, uniq, flatten, capitalize } from 'lodash';
 import { map as mapPromise } from 'bluebird';
 import {
   Sequelize,
@@ -21,11 +21,12 @@ import shimmer from 'shimmer';
 import { logger as rootLogger } from '@fjedi/logger';
 import { redis, RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
-
+//
+import runMigrations from './migrate';
 //
 import { getModelName, getTableName, filterByField } from './helpers';
 
-import runMigrations from './migrate';
+export * from './helpers';
 
 export type DatabaseConnectionOptions = {
   engine?: Dialect;
@@ -781,4 +782,119 @@ export async function initDatabase<TModels>(
   return connection;
 }
 
-export * from './helpers';
+///
+/// HOOKS
+///
+type DatabaseHookModelFields = {
+  [key: string]: any;
+};
+
+export type DatabaseHookModel = Model & {
+  changedFields: string[];
+  oldValues: DatabaseHookModelFields;
+  newValues: DatabaseHookModelFields;
+  [field: string]: any;
+};
+
+export type DatabaseHookOptions = {
+  beforeCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
+  afterCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
+};
+
+export type DatabaseHookEvents =
+  | 'beforeValidate'
+  | 'afterValidate'
+  | 'beforeCreate'
+  | 'afterCreate'
+  | 'beforeDestroy'
+  | 'afterDestroy'
+  | 'beforeUpdate'
+  | 'afterUpdate'
+  | 'beforeSave'
+  | 'afterSave'
+  | 'beforeBulkCreate'
+  | 'afterBulkCreate'
+  | 'beforeBulkDestroy'
+  | 'afterBulkDestroy'
+  | 'beforeBulkUpdate'
+  | 'afterBulkUpdate'
+  | 'beforeFind'
+  | 'beforeCount'
+  | 'beforeFindAfterExpandIncludeAll'
+  | 'beforeFindAfterOptions'
+  | 'afterFind'
+  | 'beforeSync'
+  | 'afterSync'
+  | 'beforeBulkSync'
+  | 'afterBulkSync'
+  | 'beforeDefine'
+  | 'afterDefine'
+  | 'beforeInit'
+  | 'afterInit'
+  | 'beforeConnect'
+  | 'afterConnect'
+  | 'beforeDisconnect'
+  | 'afterDisconnect';
+
+export function initModelHook<TConnection>(
+  db: DatabaseConnection & TConnection,
+  modelName: keyof DatabaseModels,
+  event: DatabaseHookEvents,
+  options: DatabaseHookOptions,
+): void {
+  const {
+    helpers: { afterCommitHook },
+    models,
+  } = db;
+  const { beforeCommit, afterCommit } = options;
+
+  //
+  models[modelName].addHook(
+    event,
+    `${modelName}${capitalize(event)}`,
+    async (instance: DatabaseHookModel, queryProps: any) => {
+      if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
+        const w = `Constructor's name (${instance.constructor.name}) differs from "modelName" value (${modelName})`;
+        logger.warn(w);
+        //
+        afterCommit(instance, queryProps);
+        return;
+      }
+      const { transaction } = queryProps || {};
+      if (!event.includes('Bulk')) {
+        //
+        if (!instance.isNewRecord) {
+          //
+          const { _changed: changedFields, _previousDataValues: prevValues, dataValues } = instance;
+          // const noChanges = Object.keys(changedFields).every((field) => !changedFields[field]);
+          const noChanges = changedFields.size === 0;
+          if (noChanges && dataValues.deletedAt === null) {
+            logger.warn('Emit db-hook event without any changes', {
+              dataValues,
+              changedFields,
+            });
+            return;
+          }
+          // eslint-disable-next-line no-param-reassign
+          instance.changedFields = instance.changed() || [];
+          // eslint-disable-next-line no-param-reassign
+          instance.oldValues = { ...prevValues };
+          // eslint-disable-next-line no-param-reassign
+          instance.newValues = { ...dataValues };
+          // Remove instance from cache
+          // @ts-ignore
+          await redis.delAsync(`${modelName}_findByPk_${instance.id}`);
+        }
+      }
+
+      //
+      if (typeof beforeCommit === 'function') {
+        await beforeCommit(instance, queryProps);
+      }
+      //
+      if (typeof afterCommit === 'function') {
+        afterCommitHook(transaction, () => afterCommit(instance, queryProps));
+      }
+    },
+  );
+}

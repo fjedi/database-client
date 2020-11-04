@@ -72,7 +72,7 @@ export default async function runMigrations(
   sequelizeInstance: Sequelize,
   cmd: MigrateCommand,
   path: string,
-) {
+): Promise<void> {
   const migrator = new Migrator(
     genUmzugConfig({
       sequelize: sequelizeInstance,
