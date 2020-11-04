@@ -1,4 +1,4 @@
-import { DataTypes, Sequelize, Model, WhereOptions, Op, Transaction } from 'sequelize';
+import { DataTypes, Sequelize, Model, ModelCtor, WhereOptions, Op, Transaction } from 'sequelize';
 import snakeCase from 'lodash/snakeCase';
 import camelCase from 'lodash/camelCase';
 import upperFirst from 'lodash/upperFirst';
@@ -22,7 +22,7 @@ export function getTableName(key: string, prefix?: string): string {
   return `${prefix || ''}${snakeCase(key)}`;
 }
 
-type Models = { [k: string]: Model };
+type Models = { [k: string]: ModelCtor<Model> };
 
 export function getModels(dbConnection: Sequelize, s: any): Models {
   const models = {} as Models;
