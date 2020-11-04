@@ -57,9 +57,6 @@ export type DatabaseTransactionProps = {
   isolationLevel?: 'READ_UNCOMMITTED' | 'READ_COMMITTED' | 'REPEATABLE_READ' | 'SERIALIZABLE';
   autocommit?: boolean;
 };
-export type DatabaseModels = {
-  [k: string]: ModelCtor<any>;
-};
 
 export type SortDirection = 'ASC' | 'DESC';
 export type DatabaseWhere = WhereOptions;
@@ -90,7 +87,7 @@ export type GetQueryTreeParams<TModels> = {
 };
 
 //
-export type DatabaseHelpers<TModels extends DatabaseModels> = {
+export type DatabaseHelpers<TModels> = {
   wrapInTransaction: (
     action: (tx: DatabaseTransaction) => Promise<any>,
     opts?: DatabaseTransactionProps,
@@ -129,7 +126,7 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
 
 type PaginationOptions = { [k: string]: any };
 
-export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
+export type DatabaseConnection<TModels> = Sequelize & {
   fieldValue: typeof Op;
   QueryTypes?: QueryTypes;
   fn?: (functionName: string, columnName: string, args?: string) => string;
@@ -138,6 +135,13 @@ export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   models: TModels;
   helpers: DatabaseHelpers<TModels>;
   redis: RedisClient;
+};
+
+type DatabaseList<TModels> = TModels[keyof TModels][];
+
+type DatabaseListWithPagination<TModels> = {
+  rows: DatabaseList<TModels>;
+  count: number;
 };
 
 //
@@ -202,7 +206,7 @@ function shimCachedInstance(instance: any) {
   );
 }
 
-function queryBuilder<TModels extends DatabaseModels>(
+function queryBuilder<TModels>(
   connection: DatabaseConnection<TModels>,
   modelName: keyof TModels,
   opts?: DatabaseTreeQueryOptions,
@@ -338,7 +342,7 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
   return connection as Sequelize;
 }
 
-export async function initDatabase<TModels extends DatabaseModels>(
+export async function initDatabase<TModels>(
   c: Sequelize,
   options: { models: TModels; migrationsPath?: string; sync: boolean },
 ): Promise<DatabaseConnection<TModels>> {
@@ -441,15 +445,18 @@ export async function initDatabase<TModels extends DatabaseModels>(
       }
     },
     async findOrCreate(modelName, where, defaults, opts) {
-      const model = models[modelName];
-      const exist = await model.findOne({
+      // @ts-ignore
+      const model = models[modelName] as ModelCtor<Model>;
+      const exist = (await model.findOne({
         where,
         ...opts,
-      });
+      })) as TModels[keyof TModels] | null;
       if (exist) {
         return [exist, false];
       }
-      return [await model.create(defaults, opts), true];
+      // @ts-ignore
+      const res = (await model.create(defaults, opts)) as TModels[keyof TModels];
+      return [res, true];
     },
     //
     async findAndCountAll(modelName, opts) {
@@ -464,12 +471,12 @@ export async function initDatabase<TModels extends DatabaseModels>(
         relationKeysMap,
         ...queryOptions
       } = opts || {};
-      //
-      const model = models[modelName];
+      // @ts-ignore
+      const model = models[modelName] as ModelCtor<Model>;
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAndCountAll_${stringify(queryOptions)}`;
-      let cachedInstance;
+      let cachedInstance: DatabaseListWithPagination<TModels> | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -477,10 +484,11 @@ export async function initDatabase<TModels extends DatabaseModels>(
           //
           if (cached) {
             const { rows, count } = parse(cached);
+            // @ts-ignore
             cachedInstance = {
               count,
               rows: await mapPromise(rows, (r: any) => model.build(r)),
-            };
+            } as DatabaseListWithPagination<TModels>;
           } else {
             cachedInstance = null;
           }
@@ -493,7 +501,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         }
       }
       //
-      const p = <TModels>queryBuilder(connection, modelName, opts);
+      const p = queryBuilder(connection, modelName, opts);
       // if (cachedInstance && cachePolicy === 'cache-first') {
       //   model
       //     .findAndCountAll(p)
@@ -502,8 +510,10 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //     })
       //     .catch(logger.error);
       // }
-      //
-      const res = cachedInstance || (await model.findAndCountAll(p));
+
+      const res =
+        // @ts-ignore
+        cachedInstance || ((await model.findAndCountAll(p)) as DatabaseListWithPagination<TModels>);
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
@@ -529,19 +539,22 @@ export async function initDatabase<TModels extends DatabaseModels>(
         relationKeysMap,
         ...queryOptions
       } = opts || {};
-      //
-      const model = models[modelName];
+      // @ts-ignore
+      const model = models[modelName] as ModelCtor<Model>;
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findAll_${stringify(queryOptions)}`;
-      let cachedInstance;
+      let cachedInstance: DatabaseList<TModels> | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
           const cached = await redis.getAsync(cacheKey);
           //
           if (cached) {
-            cachedInstance = await mapPromise(parse(cached), (r: any) => model.build(r));
+            // @ts-ignore
+            cachedInstance = (await mapPromise(parse(cached), (r: any) =>
+              model.build(r),
+            )) as DatabaseList<TModels>;
           } else {
             cachedInstance = null;
           }
@@ -554,7 +567,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         }
       }
       //
-      const p = <TModels>queryBuilder(connection, modelName, opts);
+      const p = queryBuilder(connection, modelName, opts);
       //
       // if (cachedInstance && cachePolicy === 'cache-first') {
       //   model
@@ -564,8 +577,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //     })
       //     .catch(logger.error);
       // }
-      //
-      const rows = cachedInstance || (await model.findAll(p));
+      // @ts-ignore
+      const rows = cachedInstance || ((await model.findAll(p)) as DatabaseList<TModels>);
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
@@ -585,17 +598,20 @@ export async function initDatabase<TModels extends DatabaseModels>(
         opts?.cacheKey && redis && !resolveInfo
           ? get(opts, 'cachePolicy', 'cache-first')
           : 'no-cache';
-      //
-      const model = models[modelName];
+      // @ts-ignore
+      const model = models[modelName] as ModelCtor<Model>;
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const cacheKey = `${modelName}_findOne_${opts?.cacheKey}`;
-      let cachedInstance;
+      let cachedInstance: TModels[keyof TModels] | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
           const cached = await redis.getAsync(cacheKey);
-          cachedInstance = cached ? model.build(parse(cached)) : null;
+          cachedInstance = cached
+            ? // @ts-ignore
+              (model.build(parse(cached)) as TModels[keyof TModels])
+            : null;
           //
           if (cachedInstance) {
             shimCachedInstance(cachedInstance);
@@ -622,9 +638,9 @@ export async function initDatabase<TModels extends DatabaseModels>(
         return cachedInstance;
       }
       //
-      const p = <TModels>queryBuilder(connection, modelName, opts);
-      //
-      const row = await model.findOne(p);
+      const p = queryBuilder(connection, modelName, opts);
+      // @ts-ignore
+      const row = (await model.findOne(p)) as TModels[keyof TModels];
       if (!row) {
         if (throwErrorIfNotFound) {
           throw new DefaultError(`${model.name} couldn't be found in database`, { status: 404 });
@@ -660,17 +676,20 @@ export async function initDatabase<TModels extends DatabaseModels>(
           : 'no-cache';
       //
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
-      //
-      const model = models[modelName];
+      // @ts-ignore
+      const model = models[modelName] as ModelCtor<Model>;
       //
       const cacheKey = `${modelName}_findByPk_${id}`;
-      let cachedInstance;
+      let cachedInstance: TModels[keyof TModels] | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
           const cached = await redis.getAsync(cacheKey);
           //
-          cachedInstance = cached ? model.build(parse(cached)) : null;
+          cachedInstance = cached
+            ? // @ts-ignore
+              (model.build(parse(cached)) as TModels[keyof TModels])
+            : null;
           //
           if (cachedInstance) {
             shimCachedInstance(cachedInstance);
@@ -697,9 +716,9 @@ export async function initDatabase<TModels extends DatabaseModels>(
       }
 
       //
-      const p = <TModels>queryBuilder(connection, modelName, opts);
-      //
-      const row = await model.findByPk(id, p);
+      const p = queryBuilder(connection, modelName, opts);
+      // @ts-ignore
+      const row = (await model.findByPk(id, p)) as TModels[keyof TModels];
       if (!row) {
         if (throwErrorIfNotFound) {
           throw new DefaultError(`${model.name} with ID: ${id} couldn't be found in database`, {
@@ -813,14 +832,15 @@ export type DatabaseHookEvents =
   | 'beforeDisconnect'
   | 'afterDisconnect';
 
-export function initModelHook<TModels extends DatabaseModels>(
+export function initModelHook<TModels>(
   models: TModels,
   modelName: keyof TModels,
   event: DatabaseHookEvents,
   options: DatabaseHookOptions,
 ): void {
   const { beforeCommit, afterCommit } = options;
-  const model = models[modelName];
+  // @ts-ignore
+  const model = models[modelName] as ModelCtor<Model>;
   //
   model.addHook(
     event,
