@@ -1,7 +1,8 @@
 import { DataTypes, Sequelize, Model, WhereOptions, Op } from 'sequelize';
-import { compact, reject as rejectArrayItems, isEmpty } from 'lodash';
 import snakeCase from 'lodash/snakeCase';
-import capitalize from 'lodash/capitalize';
+import camelCase from 'lodash/camelCase';
+import upperFirst from 'lodash/upperFirst';
+import compact from 'lodash/compact';
 
 // Custom Tables' names (if we need to override filename-based naming
 const dbTables: { [k: string]: any } = {};
@@ -10,7 +11,7 @@ const dbModels: { [k: string]: any } = {};
 
 //
 export function getModelName(key: string): string {
-  return dbModels[key] || capitalize(key);
+  return dbModels[key] || upperFirst(camelCase(key));
 }
 
 //

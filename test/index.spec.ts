@@ -1,5 +1,5 @@
 import { redis } from '@fjedi/redis-client';
-import { getTableName } from '../src';
+import { getTableName, getModelName } from '../src';
 
 describe('Test database-client', function () {
   beforeAll(async () => {
@@ -15,5 +15,11 @@ describe('Test database-client', function () {
     const result = getTableName('UserSession');
 
     expect(result).toBe('user_session');
+  });
+
+  it('Get valid PascalCased db-model name', async function () {
+    const result = getModelName('user-session');
+
+    expect(result).toBe('UserSession');
   });
 });
