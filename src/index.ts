@@ -663,7 +663,11 @@ export async function initDatabase<TModels extends DatabaseModels>(
       return row;
     },
     //
-    async dbInstanceById(modelName, id, opts) {
+    async dbInstanceById<TModelName extends keyof TModels>(
+      modelName: keyof TModels,
+      id: string,
+      opts?: DatabaseTreeQueryOptions,
+    ) {
       const { cachePeriod = 30000, throwErrorIfNotFound = true, resolveInfo, context } = opts || {};
       if (!id) {
         if (throwErrorIfNotFound) {
@@ -683,7 +687,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const model = models[modelName];
       //
       const cacheKey = `${modelName}_findByPk_${id}`;
-      let cachedInstance: ModelInstance<TModels[keyof TModels]> | null = null;
+      let cachedInstance: ModelInstance<TModels[TModelName]> | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -718,7 +722,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const p = queryBuilder(connection, modelName, opts);
       //
-      const row = (await model.findByPk(id, p)) as ModelInstance<TModels[keyof TModels]>;
+      const row = (await model.findByPk(id, p)) as ModelInstance<TModels[TModelName]>;
       if (!row) {
         if (throwErrorIfNotFound) {
           throw new DefaultError(`${model.name} with ID: ${id} couldn't be found in database`, {
