@@ -50,8 +50,8 @@ describe('Test database-client', function () {
       console.log(user.firstName);
     });
 
-    console.log(userById.firstName);
-    console.log(userOne.firstName);
+    console.log(userById?.firstName);
+    console.log(userOne?.firstName);
   });
 
   afterAll(async () => {
