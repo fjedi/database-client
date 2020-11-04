@@ -124,11 +124,11 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
     defaults: { [k: string]: any },
     opts?: DatabaseTreeQueryOptions,
   ) => Promise<[ModelInstance<TModels[keyof TModels]>, boolean]>;
-  dbInstanceById: (
+  dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     id: string,
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<ModelInstance<TModels[keyof TModels]> | null>;
+  ) => Promise<ModelInstance<TModels[TModelName]> | null>;
 };
 
 type PaginationOptions = { [k: string]: any };
