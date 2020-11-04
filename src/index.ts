@@ -377,6 +377,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
       // @ts-ignore
       models[modelName].initModel(connection, getTableName(modelName));
     }
+  });
+  Object.keys(models).forEach((modelName: string) => {
     // @ts-ignore
     if (models[modelName].associate) {
       // @ts-ignore
