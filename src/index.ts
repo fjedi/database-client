@@ -30,12 +30,12 @@ import { getModelName, getTableName, filterByField, afterCommitHook } from './he
 
 export * from './helpers';
 
-export interface ModelInstance<T> extends Model {
-  publicFields: Set<string>;
-  privateFields: Set<string>;
-  associate: (models: DatabaseModels) => void;
-  new (values?: unknown, options?: BuildOptions): T;
-}
+// export interface ModelInstance<T> extends Model {
+//   publicFields: Set<string>;
+//   privateFields: Set<string>;
+//   associate: (models: DatabaseModels) => void;
+//   new (values?: unknown, options?: BuildOptions): T;
+// }
 
 export type DatabaseConnectionOptions = {
   engine?: Dialect;
@@ -97,12 +97,71 @@ export type GetQueryTreeParams<TModels extends DatabaseModels> = {
   relationKeysMap?: Map<string, string>;
 };
 
+///
+/// HOOKS
+///
+type DatabaseHookModelFields = {
+  [key: string]: any;
+};
+
+export type DatabaseHookModel = Model & {
+  changedFields: string[];
+  oldValues: DatabaseHookModelFields;
+  newValues: DatabaseHookModelFields;
+  [field: string]: any;
+};
+
+export type DatabaseHookOptions = {
+  beforeCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
+  afterCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
+};
+
+export type DatabaseHookEvents =
+  | 'beforeValidate'
+  | 'afterValidate'
+  | 'beforeCreate'
+  | 'afterCreate'
+  | 'beforeDestroy'
+  | 'afterDestroy'
+  | 'beforeUpdate'
+  | 'afterUpdate'
+  | 'beforeSave'
+  | 'afterSave'
+  | 'beforeBulkCreate'
+  | 'afterBulkCreate'
+  | 'beforeBulkDestroy'
+  | 'afterBulkDestroy'
+  | 'beforeBulkUpdate'
+  | 'afterBulkUpdate'
+  | 'beforeFind'
+  | 'beforeCount'
+  | 'beforeFindAfterExpandIncludeAll'
+  | 'beforeFindAfterOptions'
+  | 'afterFind'
+  | 'beforeSync'
+  | 'afterSync'
+  | 'beforeBulkSync'
+  | 'afterBulkSync'
+  | 'beforeDefine'
+  | 'afterDefine'
+  | 'beforeInit'
+  | 'afterInit'
+  | 'beforeConnect'
+  | 'afterConnect'
+  | 'beforeDisconnect'
+  | 'afterDisconnect';
+
 //
 export type DatabaseHelpers<TModels extends DatabaseModels> = {
   wrapInTransaction: (
     action: (tx: DatabaseTransaction) => Promise<any>,
     opts?: DatabaseTransactionProps,
   ) => Promise<any>;
+  initModelHook: (
+    modelName: keyof TModels,
+    event: DatabaseHookEvents,
+    options: DatabaseHookOptions,
+  ) => void;
   afterCommitHook: typeof afterCommitHook;
   getListQueryOptions(query: any, defaults?: any): PaginationOptions;
   getModelName: typeof getModelName;
@@ -440,7 +499,71 @@ export async function initDatabase<TModels extends DatabaseModels>(
         [EXPECTED_OPTIONS_KEY]: createContext(connection),
       };
     },
+    //
     afterCommitHook,
+    //
+    initModelHook(
+      modelName: keyof TModels,
+      event: DatabaseHookEvents,
+      o: DatabaseHookOptions,
+    ): void {
+      const { beforeCommit, afterCommit } = o;
+      //
+      const model = models[modelName];
+      //
+      model.addHook(
+        event,
+        `${modelName}${capitalize(event)}`,
+        async (instance: DatabaseHookModel, queryProps: any) => {
+          if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
+            const w = `Constructor's name (${instance.constructor.name}) differs from "modelName" value (${modelName})`;
+            logger.warn(w);
+            //
+            afterCommit(instance, queryProps);
+            return;
+          }
+          const { transaction } = queryProps || {};
+          if (!event.includes('Bulk')) {
+            //
+            if (!instance.isNewRecord) {
+              //
+              const {
+                _changed: changedFields,
+                _previousDataValues: prevValues,
+                dataValues,
+              } = instance;
+              // const noChanges = Object.keys(changedFields).every((field) => !changedFields[field]);
+              const noChanges = changedFields.size === 0;
+              if (noChanges && dataValues.deletedAt === null) {
+                logger.warn('Emit db-hook event without any changes', {
+                  dataValues,
+                  changedFields,
+                });
+                return;
+              }
+              // eslint-disable-next-line no-param-reassign
+              instance.changedFields = instance.changed() || [];
+              // eslint-disable-next-line no-param-reassign
+              instance.oldValues = { ...prevValues };
+              // eslint-disable-next-line no-param-reassign
+              instance.newValues = { ...dataValues };
+              // Remove instance from cache
+              // @ts-ignore
+              await redis.delAsync(`${modelName}_findByPk_${instance.id}`);
+            }
+          }
+
+          //
+          if (typeof beforeCommit === 'function') {
+            await beforeCommit(instance, queryProps);
+          }
+          //
+          if (typeof afterCommit === 'function') {
+            afterCommitHook(transaction, () => afterCommit(instance, queryProps));
+          }
+        },
+      );
+    },
     //
     async wrapInTransaction(
       action: (transaction: Transaction) => Promise<any>,
@@ -819,118 +942,4 @@ export async function initDatabase<TModels extends DatabaseModels>(
 
   // @ts-ignore
   return connection;
-}
-
-///
-/// HOOKS
-///
-type DatabaseHookModelFields = {
-  [key: string]: any;
-};
-
-export type DatabaseHookModel = Model & {
-  changedFields: string[];
-  oldValues: DatabaseHookModelFields;
-  newValues: DatabaseHookModelFields;
-  [field: string]: any;
-};
-
-export type DatabaseHookOptions = {
-  beforeCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
-  afterCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
-};
-
-export type DatabaseHookEvents =
-  | 'beforeValidate'
-  | 'afterValidate'
-  | 'beforeCreate'
-  | 'afterCreate'
-  | 'beforeDestroy'
-  | 'afterDestroy'
-  | 'beforeUpdate'
-  | 'afterUpdate'
-  | 'beforeSave'
-  | 'afterSave'
-  | 'beforeBulkCreate'
-  | 'afterBulkCreate'
-  | 'beforeBulkDestroy'
-  | 'afterBulkDestroy'
-  | 'beforeBulkUpdate'
-  | 'afterBulkUpdate'
-  | 'beforeFind'
-  | 'beforeCount'
-  | 'beforeFindAfterExpandIncludeAll'
-  | 'beforeFindAfterOptions'
-  | 'afterFind'
-  | 'beforeSync'
-  | 'afterSync'
-  | 'beforeBulkSync'
-  | 'afterBulkSync'
-  | 'beforeDefine'
-  | 'afterDefine'
-  | 'beforeInit'
-  | 'afterInit'
-  | 'beforeConnect'
-  | 'afterConnect'
-  | 'beforeDisconnect'
-  | 'afterDisconnect';
-
-export function initModelHook<TModels extends DatabaseModels>(
-  models: TModels,
-  modelName: keyof TModels,
-  event: DatabaseHookEvents,
-  options: DatabaseHookOptions,
-): void {
-  const { beforeCommit, afterCommit } = options;
-  //
-  const model = models[modelName];
-  //
-  model.addHook(
-    event,
-    `${modelName}${capitalize(event)}`,
-    async (instance: DatabaseHookModel, queryProps: any) => {
-      if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
-        const w = `Constructor's name (${instance.constructor.name}) differs from "modelName" value (${modelName})`;
-        logger.warn(w);
-        //
-        afterCommit(instance, queryProps);
-        return;
-      }
-      const { transaction } = queryProps || {};
-      if (!event.includes('Bulk')) {
-        //
-        if (!instance.isNewRecord) {
-          //
-          const { _changed: changedFields, _previousDataValues: prevValues, dataValues } = instance;
-          // const noChanges = Object.keys(changedFields).every((field) => !changedFields[field]);
-          const noChanges = changedFields.size === 0;
-          if (noChanges && dataValues.deletedAt === null) {
-            logger.warn('Emit db-hook event without any changes', {
-              dataValues,
-              changedFields,
-            });
-            return;
-          }
-          // eslint-disable-next-line no-param-reassign
-          instance.changedFields = instance.changed() || [];
-          // eslint-disable-next-line no-param-reassign
-          instance.oldValues = { ...prevValues };
-          // eslint-disable-next-line no-param-reassign
-          instance.newValues = { ...dataValues };
-          // Remove instance from cache
-          // @ts-ignore
-          await redis.delAsync(`${modelName}_findByPk_${instance.id}`);
-        }
-      }
-
-      //
-      if (typeof beforeCommit === 'function') {
-        await beforeCommit(instance, queryProps);
-      }
-      //
-      if (typeof afterCommit === 'function') {
-        afterCommitHook(transaction, () => afterCommit(instance, queryProps));
-      }
-    },
-  );
 }
