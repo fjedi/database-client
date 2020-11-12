@@ -13,7 +13,7 @@ import {
   DataTypes,
   Model,
   ModelCtor,
-  BuildOptions,
+  Order,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
@@ -80,6 +80,8 @@ export interface DatabaseQueryOptions extends QueryOptions {
   include?: IncludeOptions[];
   raw?: boolean;
   context?: unknown;
+  limit?: number;
+  order?: Order;
 }
 export interface DatabaseTreeQueryOptions extends DatabaseQueryOptions {
   cachePolicy?: 'no-cache' | 'cache-first' | 'cache-only';
