@@ -199,9 +199,9 @@ type PaginationOptions = { [k: string]: any };
 export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   fieldValue: typeof Op;
   QueryTypes?: QueryTypes;
-  fn?: (functionName: string, columnName: string, args?: string) => string;
-  col?: (v: string) => string;
-  literal?: (v: string) => string;
+  fn: (functionName: string, columnName: string, args?: string) => string;
+  col: (v: string) => string;
+  literal: (v: string) => string;
   models: TModels;
   helpers: DatabaseHelpers<TModels>;
   redis: RedisClient;
