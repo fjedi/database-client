@@ -59,6 +59,15 @@ export type DatabaseConnectionOptions = {
   maxConnections: number;
   minConnections?: number;
 };
+
+export type InitDatabaseOptions<TModels> = {
+  models: TModels;
+  migrationsPath?: string;
+  sync?: boolean;
+  tableNamePrefix?: string;
+  maxRowsPerQuery?: number;
+};
+
 export type DatabaseTransaction = Transaction;
 export type DatabaseTransactionProps = {
   transaction?: DatabaseTransaction;
@@ -422,13 +431,7 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
 
 export async function initDatabase<TModels extends DatabaseModels>(
   c: Sequelize,
-  options: {
-    models: TModels;
-    migrationsPath?: string;
-    sync?: boolean;
-    tableNamePrefix?: string;
-    maxRowsPerQuery?: number;
-  },
+  options: InitDatabaseOptions<TModels>,
 ): Promise<DatabaseConnection<TModels>> {
   const { sync, migrationsPath, models, tableNamePrefix, maxRowsPerQuery = 500 } = options || {};
 
