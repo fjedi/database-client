@@ -422,9 +422,9 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
 
 export async function initDatabase<TModels extends DatabaseModels>(
   c: Sequelize,
-  options: { models: TModels; migrationsPath?: string; sync?: boolean },
+  options: { models: TModels; migrationsPath?: string; sync?: boolean; tableNamePrefix?: string },
 ): Promise<DatabaseConnection<TModels>> {
-  const { sync, migrationsPath, models } = options || {};
+  const { sync, migrationsPath, models, tableNamePrefix } = options || {};
 
   //
   const connection = c as DatabaseConnection<TModels>;
@@ -436,7 +436,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     // @ts-ignore
     if (models[modelName].initModel) {
       // @ts-ignore
-      models[modelName].initModel(connection, getTableName(modelName));
+      models[modelName].initModel(connection, getTableName(modelName, tableNamePrefix));
     }
   });
   Object.keys(models).forEach((modelName: string) => {
