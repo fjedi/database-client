@@ -1,6 +1,6 @@
 {
   "name": "@fjedi/database-client",
-  "version": "3.2.5",
+  "version": "3.3.0",
   "description": "Wrapper around sequelize ORM with some fancy helpers for caching and full-data-tree sql-joins",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
@@ -72,7 +72,7 @@
     "lint-staged": "10.5.1",
     "prettier": "2.1.2",
     "rimraf": "3.0.2",
-    "ts-jest": "26.4.3",
+    "ts-jest": "26.4.4",
     "typescript": "4.0.5"
   },
   "lint-staged": {
