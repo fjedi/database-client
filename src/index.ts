@@ -422,9 +422,15 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
 
 export async function initDatabase<TModels extends DatabaseModels>(
   c: Sequelize,
-  options: { models: TModels; migrationsPath?: string; sync?: boolean; tableNamePrefix?: string },
+  options: {
+    models: TModels;
+    migrationsPath?: string;
+    sync?: boolean;
+    tableNamePrefix?: string;
+    maxRowsPerQuery?: number;
+  },
 ): Promise<DatabaseConnection<TModels>> {
-  const { sync, migrationsPath, models, tableNamePrefix } = options || {};
+  const { sync, migrationsPath, models, tableNamePrefix, maxRowsPerQuery = 500 } = options || {};
 
   //
   const connection = c as DatabaseConnection<TModels>;
@@ -917,7 +923,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const direction = get(sort, 'direction', 'DESC');
 
       return {
-        limit: limit > 150 ? 150 : limit,
+        limit: limit > maxRowsPerQuery ? maxRowsPerQuery : limit,
         offset,
         order: fields.map((field) => [field, direction]),
       };
