@@ -1,6 +1,6 @@
 {
   "name": "@fjedi/database-client",
-  "version": "3.2.5",
+  "version": "3.3.0",
   "description": "Wrapper around sequelize ORM with some fancy helpers for caching and full-data-tree sql-joins",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
@@ -43,7 +43,7 @@
     "@types/bluebird": "3.5.33",
     "@types/graphql-list-fields": "2.0.3",
     "@types/json-buffer": "3.0.0",
-    "@types/lodash": "4.14.164",
+    "@types/lodash": "4.14.165",
     "@types/shimmer": "1.0.1",
     "@types/umzug": "2.3.0",
     "bluebird": "3.7.2",
