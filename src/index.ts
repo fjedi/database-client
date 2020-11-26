@@ -534,7 +534,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
             return;
           }
           const { transaction } = queryProps || {};
-          if (!event.includes('Bulk')) {
+          if (!event.includes('Bulk') && !event.includes('Create') && !event.includes('Destroy')) {
             //
             if (!instance.isNewRecord) {
               //
@@ -558,10 +558,12 @@ export async function initDatabase<TModels extends DatabaseModels>(
               instance.oldValues = { ...prevValues };
               // eslint-disable-next-line no-param-reassign
               instance.newValues = { ...dataValues };
-              // Remove instance from cache
-              // @ts-ignore
-              await redis.delAsync(`${modelName}_findByPk_${instance.id}`);
             }
+          }
+          if (event.includes('Destroy') || event.includes('Update')) {
+            // Remove instance from cache
+            // @ts-ignore
+            await redis.delAsync(`${modelName}_findByPk_${instance.id}`);
           }
 
           //
