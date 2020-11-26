@@ -1,6 +1,6 @@
 {
   "name": "@fjedi/database-client",
-  "version": "3.2.5",
+  "version": "3.4.0",
   "description": "Wrapper around sequelize ORM with some fancy helpers for caching and full-data-tree sql-joins",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
@@ -43,7 +43,7 @@
     "@types/bluebird": "3.5.33",
     "@types/graphql-list-fields": "2.0.3",
     "@types/json-buffer": "3.0.0",
-    "@types/lodash": "4.14.164",
+    "@types/lodash": "4.14.165",
     "@types/shimmer": "1.0.1",
     "@types/umzug": "2.3.0",
     "bluebird": "3.7.2",
@@ -59,10 +59,10 @@
   "devDependencies": {
     "@types/expect": "24.3.0",
     "@types/jest": "26.0.15",
-    "@types/node": "14.14.6",
-    "@typescript-eslint/eslint-plugin": "4.6.1",
-    "@typescript-eslint/parser": "4.6.1",
-    "eslint": "7.12.1",
+    "@types/node": "14.14.7",
+    "@typescript-eslint/eslint-plugin": "4.7.0",
+    "@typescript-eslint/parser": "4.7.0",
+    "eslint": "7.13.0",
     "eslint-config-airbnb-typescript": "12.0.0",
     "eslint-config-prettier": "6.15.0",
     "eslint-plugin-import": "2.22.1",
@@ -72,7 +72,7 @@
     "lint-staged": "10.5.1",
     "prettier": "2.1.2",
     "rimraf": "3.0.2",
-    "ts-jest": "26.4.3",
+    "ts-jest": "26.4.4",
     "typescript": "4.0.5"
   },
   "lint-staged": {
