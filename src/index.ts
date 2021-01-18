@@ -55,6 +55,11 @@ export {
   BelongsToManyRemoveAssociationMixin,
   BelongsToManyAddAssociationMixinOptions,
   BelongsToManyRemoveAssociationMixinOptions,
+  //
+  ValidationError,
+  OptimisticLockError,
+  DatabaseError,
+  UniqueConstraintError,
 } from 'sequelize';
 
 export * from './helpers';
