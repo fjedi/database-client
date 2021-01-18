@@ -28,6 +28,33 @@ import runMigrations from './migrate';
 //
 import { getModelName, getTableName, filterByField, afterCommitHook } from './helpers';
 
+export {
+  Sequelize,
+  Op,
+  Transaction,
+  QueryOptions,
+  WhereOptions,
+  IncludeOptions,
+  Dialect,
+  QueryTypes,
+  Options,
+  DataTypes,
+  Model,
+  ModelCtor,
+  Order,
+  //
+  BelongsToGetAssociationMixin,
+  BelongsToSetAssociationMixin,
+  BelongsToCreateAssociationMixin,
+  HasManyCreateAssociationMixin,
+  HasManyCountAssociationsMixin,
+  HasManyGetAssociationsMixin,
+  BelongsToManyAddAssociationMixin,
+  BelongsToManyRemoveAssociationMixin,
+  BelongsToManyAddAssociationMixinOptions,
+  BelongsToManyRemoveAssociationMixinOptions,
+} from 'sequelize';
+
 export * from './helpers';
 
 // export interface ModelInstance<T> extends Model {
