@@ -31,6 +31,10 @@ import { getModelName, getTableName, filterByField, afterCommitHook } from './he
 export {
   Sequelize,
   Op,
+  col,
+  fn,
+  literal,
+  where,
   Transaction,
   QueryOptions,
   WhereOptions,
