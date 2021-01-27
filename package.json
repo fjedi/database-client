@@ -37,7 +37,7 @@
   },
   "homepage": "https://github.com/fjedi/database-client#readme",
   "dependencies": {
-    "@fjedi/errors": "1.0.1",
+    "@fjedi/errors": "1.1.1",
     "@fjedi/logger": "1.34.0",
     "@fjedi/redis-client": "1.0.2",
     "@types/bluebird": "3.5.33",
