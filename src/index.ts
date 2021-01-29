@@ -238,7 +238,7 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   ) => Promise<[TModels[TModelName], boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    id: string,
+    id: unknown,
     opts?: DatabaseTreeQueryOptions,
   ) => Promise<TModels[TModelName] | null>;
 };
@@ -878,7 +878,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async dbInstanceById<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      id: string,
+      id: unknown,
       opts?: DatabaseTreeQueryOptions,
     ) {
       const { cachePeriod = 30000, throwErrorIfNotFound = true, resolveInfo, context } = opts || {};
