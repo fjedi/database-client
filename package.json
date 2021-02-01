@@ -38,7 +38,7 @@
   "homepage": "https://github.com/fjedi/database-client#readme",
   "dependencies": {
     "@fjedi/errors": "1.1.2",
-    "@fjedi/logger": "1.38.0",
+    "@fjedi/logger": "1.39.0",
     "@fjedi/redis-client": "1.0.2",
     "@types/bluebird": "3.5.33",
     "@types/graphql-list-fields": "2.0.3",
