@@ -42,6 +42,7 @@ export {
   Dialect,
   QueryTypes,
   Options,
+  Optional,
   DataTypes,
   Model,
   ModelCtor,
