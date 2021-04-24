@@ -129,6 +129,7 @@ export interface DatabaseQueryOptions extends QueryOptions {
   raw?: boolean;
   context?: unknown;
   limit?: number;
+  offset?: number;
   order?: Order;
 }
 export interface DatabaseTreeQueryOptions extends DatabaseQueryOptions {
@@ -726,6 +727,11 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //     .catch(logger.error);
       // }
 
+      // Disable recursive db-query as model.findAndCountAll works improperly with pagination
+      if (typeof opts?.limit !== 'undefined' || typeof opts?.offset !== 'undefined') {
+        delete p.resolveInfo;
+      }
+      //
       const res = cachedInstance || (await model.findAndCountAll(p));
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
