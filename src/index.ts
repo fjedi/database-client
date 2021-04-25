@@ -14,6 +14,7 @@ import {
   Model,
   ModelCtor,
   Order,
+  Association,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
@@ -218,7 +219,11 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   getModelName: typeof getModelName;
   getTableName: typeof getTableName;
   filterByField: typeof filterByField;
-  getQueryTree: (p: GetQueryTreeParams<TModels>) => any;
+  getQueryTree: (
+    p: GetQueryTreeParams<TModels> & {
+      query: 'findAndCountAll' | 'findAll' | 'findOne' | 'dbInstanceById';
+    },
+  ) => any;
   createDatabaseContext: (p: any) => any;
   findAndCountAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
@@ -336,7 +341,9 @@ function shimCachedInstance(instance: any) {
 function queryBuilder<TModels extends DatabaseModels>(
   connection: DatabaseConnection<TModels>,
   modelName: keyof TModels,
-  opts?: DatabaseTreeQueryOptions,
+  opts: DatabaseTreeQueryOptions & {
+    query: 'findAndCountAll' | 'findAll' | 'findOne' | 'dbInstanceById';
+  },
 ) {
   const {
     context,
@@ -345,6 +352,7 @@ function queryBuilder<TModels extends DatabaseModels>(
     resolveInfo,
     relationKeysMap,
     attributes = [],
+    query,
     ...bypassParams
   } = opts || {};
   //
@@ -360,6 +368,7 @@ function queryBuilder<TModels extends DatabaseModels>(
   if (resolveInfo) {
     const fields: string[] = getQueryFields(resolveInfo);
     queryParams.include = connection.helpers.getQueryTree({
+      query,
       fields,
       databaseModel: model,
       includes: bypassParams.include,
@@ -509,8 +518,12 @@ export async function initDatabase<TModels extends DatabaseModels>(
     getTableName,
     filterByField,
     //
-    getQueryTree(params: GetQueryTreeParams<TModels>) {
-      const { fields, databaseModel, includes = [], relationKeysMap } = params;
+    getQueryTree(
+      params: GetQueryTreeParams<TModels> & {
+        query: 'findAndCountAll' | 'findAll' | 'findOne' | 'dbInstanceById';
+      },
+    ) {
+      const { query, fields, databaseModel, includes = [], relationKeysMap } = params;
       (fields || []).forEach((i) => {
         const field = i.split('.');
         // Skip "rows" field
@@ -520,8 +533,14 @@ export async function initDatabase<TModels extends DatabaseModels>(
         //
         if (association) {
           //
-          const { target: model } = association;
-          if (!includes.some((include) => include.as === as)) {
+          const { target: model, associationType } = association as Association;
+
+          // Disable recursive db-query as model.findAndCountAll works improperly with pagination
+          const disabledNestedInclude =
+            query === 'findAndCountAll' &&
+            (associationType === 'hasMany' || associationType === '');
+
+          if (!disabledNestedInclude && !includes.some((include) => include.as === as)) {
             includes.push({
               paranoid: false,
               model,
@@ -717,7 +736,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         }
       }
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = queryBuilder(connection, modelName, { ...opts, query: 'findAndCountAll' });
       // if (cachedInstance && cachePolicy === 'cache-first') {
       //   model
       //     .findAndCountAll(p)
@@ -727,11 +746,6 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //     .catch(logger.error);
       // }
 
-      // Disable recursive db-query as model.findAndCountAll works improperly with pagination
-      if (typeof opts?.limit !== 'undefined' || typeof opts?.offset !== 'undefined') {
-        delete p.resolveInfo;
-      }
-      //
       const res = cachedInstance || (await model.findAndCountAll(p));
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
@@ -789,7 +803,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         }
       }
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = queryBuilder(connection, modelName, { ...opts, query: 'findAll' });
       //
       // if (cachedInstance && cachePolicy === 'cache-first') {
       //   model
@@ -861,7 +875,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         return cachedInstance;
       }
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = queryBuilder(connection, modelName, { ...opts, query: 'findOne' });
       // @ts-ignore
       const row = (await model.findOne(p)) as TModels[TModelName];
       if (!row) {
@@ -940,7 +954,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       }
 
       //
-      const p = queryBuilder(connection, modelName, opts);
+      const p = queryBuilder(connection, modelName, { ...opts, query: 'dbInstanceById' });
       // @ts-ignore
       const row = (await model.findByPk(id, p)) as TModels[TModelName];
       if (!row) {
