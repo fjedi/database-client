@@ -538,7 +538,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
           // Disable recursive db-query as model.findAndCountAll works improperly with pagination
           const disabledNestedInclude =
             query === 'findAndCountAll' &&
-            (associationType === 'hasMany' || associationType === '');
+            (associationType === 'HasMany' || associationType === 'BelongsToMany');
 
           if (!disabledNestedInclude && !includes.some((include) => include.as === as)) {
             includes.push({
@@ -546,6 +546,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
               model,
               as,
               include: connection.helpers.getQueryTree({
+                query,
                 relationKeysMap,
                 fields: (fields || [])
                   .filter((f) => f.split('.').includes(as))
