@@ -263,14 +263,12 @@ export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   redis: RedisClient;
 };
 
-export type DatabaseList<
-  TModels extends DatabaseModels,
-  TModelName extends keyof TModels
-> = TModels[TModelName][];
+export type DatabaseList<TModels extends DatabaseModels, TModelName extends keyof TModels> =
+  TModels[TModelName][];
 
 export type DatabaseListWithPagination<
   TModels extends DatabaseModels,
-  TModelName extends keyof TModels
+  TModelName extends keyof TModels,
 > = {
   rows: DatabaseList<TModels, TModelName>;
   count: number;
@@ -832,8 +830,13 @@ export async function initDatabase<TModels extends DatabaseModels>(
       modelName: keyof TModels,
       opts?: DatabaseTreeQueryOptions,
     ) {
-      const { cachePeriod = 30000, throwErrorIfNotFound = true, context, resolveInfo, raw } =
-        opts || {};
+      const {
+        cachePeriod = 30000,
+        throwErrorIfNotFound = true,
+        context,
+        resolveInfo,
+        raw,
+      } = opts || {};
       const cachePolicy =
         opts?.cacheKey && redis && !resolveInfo
           ? get(opts, 'cachePolicy', 'cache-first')
