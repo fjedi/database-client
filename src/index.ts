@@ -128,6 +128,7 @@ export interface DatabaseQueryOptions extends QueryOptions {
   where?: WhereOptions;
   include?: IncludeOptions[];
   raw?: boolean;
+  paranoid?: boolean;
   context?: unknown;
   limit?: number;
   offset?: number;
@@ -263,8 +264,10 @@ export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   redis: RedisClient;
 };
 
-export type DatabaseList<TModels extends DatabaseModels, TModelName extends keyof TModels> =
-  TModels[TModelName][];
+export type DatabaseList<
+  TModels extends DatabaseModels,
+  TModelName extends keyof TModels,
+> = TModels[TModelName][];
 
 export type DatabaseListWithPagination<
   TModels extends DatabaseModels,
@@ -639,7 +642,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async wrapInTransaction(
       action: (transaction: Transaction) => Promise<any>,
       opts?: DatabaseTransactionProps,
-    ): Promise<any> {
+    ): Promise<void> {
       const { isolationLevel, autocommit = false } = opts || {};
       // If no parent transaction has been passed inside "opts"
       // init new transaction
