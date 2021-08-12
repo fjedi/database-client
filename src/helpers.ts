@@ -22,7 +22,7 @@ export function getTableName(key: string, prefix?: string): string {
   return `${prefix || ''}${snakeCase(key)}`;
 }
 
-export type CompareType = 'like' | 'notLike' | 'in' | 'notIn' | 'eq' | 'ne';
+export type CompareType = 'like' | 'notLike' | 'in' | 'notIn' | 'eq' | 'ne' | 'timeRange';
 
 export type CompareValues = string | string[] | number | number[] | Array<string | number>;
 
@@ -31,6 +31,10 @@ export function getCompareSymbol(
   vals: CompareValues,
 ): typeof Op[keyof typeof Op] {
   let symbol: keyof typeof Op;
+  //
+  if (compareType === 'timeRange') {
+    throw new Error('Invalid usage of "getCompareSymbol" helper');
+  }
   //
   switch (compareType) {
     case 'in':
@@ -52,6 +56,32 @@ export function filterByField(
   values: CompareValues,
   compareType: CompareType,
 ): void {
+  //
+  if (compareType === 'timeRange') {
+    if (Array.isArray(values) && values.length > 0) {
+      const [from, to] = values;
+      if (from && to) {
+        // @ts-ignore
+        // eslint-disable-next-line no-param-reassign
+        where[field] = {
+          [Op.between]: [from, to],
+        };
+      } else if (from) {
+        // @ts-ignore
+        // eslint-disable-next-line no-param-reassign
+        where[field] = {
+          [Op.gte]: from,
+        };
+      } else if (to) {
+        // @ts-ignore
+        // eslint-disable-next-line no-param-reassign
+        where[field] = {
+          [Op.lte]: to,
+        };
+      }
+    }
+    return;
+  }
   //
   if (
     values === null ||
