@@ -24,7 +24,15 @@ export function getTableName(key: string, prefix?: string): string {
 
 export type CompareType = 'like' | 'notLike' | 'in' | 'notIn' | 'eq' | 'ne' | 'timeRange';
 
-export type CompareValues = string | string[] | number | number[] | Array<string | number>;
+export type TimeRangeType = { from?: string | Date; to?: string | Date };
+
+export type CompareValues =
+  | string
+  | string[]
+  | number
+  | number[]
+  | Array<string | number>
+  | TimeRangeType;
 
 export function getCompareSymbol(
   compareType: CompareType,
@@ -58,27 +66,28 @@ export function filterByField(
 ): void {
   //
   if (compareType === 'timeRange') {
-    if (Array.isArray(values) && values.length > 0) {
-      const [from, to] = values;
-      if (from && to) {
-        // @ts-ignore
-        // eslint-disable-next-line no-param-reassign
-        where[field] = {
-          [Op.between]: [from, to],
-        };
-      } else if (from) {
-        // @ts-ignore
-        // eslint-disable-next-line no-param-reassign
-        where[field] = {
-          [Op.gte]: from,
-        };
-      } else if (to) {
-        // @ts-ignore
-        // eslint-disable-next-line no-param-reassign
-        where[field] = {
-          [Op.lte]: to,
-        };
-      }
+    if (!values) {
+      return;
+    }
+    const { from, to } = values as TimeRangeType;
+    if (from && to) {
+      // @ts-ignore
+      // eslint-disable-next-line no-param-reassign
+      where[field] = {
+        [Op.between]: [from, to],
+      };
+    } else if (from) {
+      // @ts-ignore
+      // eslint-disable-next-line no-param-reassign
+      where[field] = {
+        [Op.gte]: from,
+      };
+    } else if (to) {
+      // @ts-ignore
+      // eslint-disable-next-line no-param-reassign
+      where[field] = {
+        [Op.lte]: to,
+      };
     }
     return;
   }
