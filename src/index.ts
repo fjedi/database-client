@@ -918,7 +918,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const { cachePeriod = 30000, throwErrorIfNotFound = true, resolveInfo, context } = opts || {};
       if (!id) {
         if (throwErrorIfNotFound) {
-          throw new DefaultError(`${modelName} with ID: ${id} couldn't be found in database`, {
+          throw new DefaultError(`${modelName} with ID: "${id}" couldn't be found in database`, {
             status: 404,
           });
         }
@@ -972,7 +972,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const row = (await model.findByPk(id, p)) as TModels[TModelName];
       if (!row) {
         if (throwErrorIfNotFound) {
-          throw new DefaultError(`${model.name} with ID: ${id} couldn't be found in database`, {
+          throw new DefaultError(`${model.name} with ID: "${id}" couldn't be found in database`, {
             status: 404,
           });
         }
