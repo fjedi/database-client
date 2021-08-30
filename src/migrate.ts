@@ -131,7 +131,7 @@ export default async function runMigrations(
     const errorStr = `DB-MIGRATION ${cmd.toUpperCase()} ERROR`;
     logger.info(errorStr);
     logger.info('='.repeat(errorStr.length));
-    logger.info(err);
+    logger.info(err as Error);
     logger.info('='.repeat(errorStr.length));
   }
 }

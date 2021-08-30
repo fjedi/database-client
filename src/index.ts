@@ -740,7 +740,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
           }
         } catch (err) {
           cachedInstance = null;
-          logger.error(err);
+          logger.error(err as Error);
         }
       }
       //
@@ -807,7 +807,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
           }
         } catch (err) {
           cachedInstance = null;
-          logger.error(err);
+          logger.error(err as Error);
         }
       }
       //
@@ -872,7 +872,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
           }
         } catch (err) {
           cachedInstance = null;
-          logger.error(err);
+          logger.error(err as Error);
         }
       }
       //
@@ -951,7 +951,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
           }
         } catch (err) {
           cachedInstance = null;
-          logger.error(err);
+          logger.error(err as Error);
         }
       }
       //
