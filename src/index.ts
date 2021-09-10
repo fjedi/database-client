@@ -6,6 +6,7 @@ import {
   Transaction,
   QueryOptions,
   WhereOptions,
+  where as whereFn,
   IncludeOptions,
   Dialect,
   QueryTypes,
@@ -15,6 +16,13 @@ import {
   ModelCtor,
   Order,
   Association,
+  fn,
+  col,
+  literal,
+  and,
+  cast,
+  or,
+  json,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
@@ -56,9 +64,13 @@ export {
   BelongsToCreateAssociationMixinOptions,
   HasOneCreateAssociationMixin,
   HasOneGetAssociationMixin,
+  HasOneSetAssociationMixin,
+  HasOneSetAssociationMixinOptions,
   HasManyCreateAssociationMixin,
   HasManyCountAssociationsMixin,
   HasManyGetAssociationsMixin,
+  HasManyRemoveAssociationMixin,
+  HasManyRemoveAssociationMixinOptions,
   BelongsToManySetAssociationsMixin,
   BelongsToManySetAssociationsMixinOptions,
   BelongsToManyAddAssociationMixin,
@@ -262,9 +274,14 @@ type PaginationOptions = { [k: string]: any };
 export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   fieldValue: typeof Op;
   QueryTypes?: QueryTypes;
-  fn: (functionName: string, columnName: string, args?: string) => string;
-  col: (v: string) => string;
-  literal: (v: string) => string;
+  fn: typeof fn;
+  col: typeof col;
+  literal: typeof literal;
+  where: typeof whereFn;
+  and: typeof and;
+  cast: typeof cast;
+  or: typeof or;
+  json: typeof json;
   models: TModels;
   helpers: DatabaseHelpers<TModels>;
   redis: RedisClient;
