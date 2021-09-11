@@ -39,7 +39,7 @@
   "dependencies": {
     "@fjedi/errors": "1.1.4",
     "@fjedi/logger": "1.46.3",
-    "@fjedi/redis-client": "1.162.0",
+    "@fjedi/redis-client": "1.163.0",
     "@types/bluebird": "3.5.36",
     "@types/graphql-list-fields": "2.0.3",
     "@types/json-buffer": "3.0.0",
