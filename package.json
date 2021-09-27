@@ -43,7 +43,7 @@
     "@types/bluebird": "3.5.36",
     "@types/graphql-list-fields": "2.0.3",
     "@types/json-buffer": "3.0.0",
-    "@types/lodash": "4.14.174",
+    "@types/lodash": "4.14.175",
     "@types/shimmer": "1.0.2",
     "@types/umzug": "2.3.2",
     "bluebird": "3.7.2",
