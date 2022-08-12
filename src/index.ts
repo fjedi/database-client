@@ -1,4 +1,4 @@
-import { get, uniq, flatten, capitalize } from 'lodash';
+import { get, uniq, flatten, capitalize, pick } from 'lodash';
 import { map as mapPromise } from 'bluebird';
 import {
   Sequelize,
@@ -168,6 +168,12 @@ export type GetQueryTreeParams<TModels extends DatabaseModels> = {
   relationKeysMap?: Map<string, string>;
 };
 
+export type ListQueryOptions = {
+  limit: number;
+  offset: number;
+  order: [string, SortDirection][];
+};
+
 ///
 /// HOOKS
 ///
@@ -234,7 +240,11 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
     options: DatabaseHookOptions,
   ) => void;
   afterCommitHook: typeof afterCommitHook;
-  getListQueryOptions(query: any, defaults?: any): PaginationOptions;
+  getListQueryOptions(query: any, defaults?: any): ListQueryOptions;
+  getListWithPageInfo<TModelName extends keyof TModels>(
+    list: Omit<DatabaseListWithPagination<TModels, TModelName>, 'pageInfo'> | null,
+    pagination: Pick<ListQueryOptions, 'limit' | 'offset'>,
+  ): DatabaseListWithPagination<TModels, TModelName>;
   getModelName: typeof getModelName;
   getTableName: typeof getTableName;
   filterByField: typeof filterByField;
@@ -269,8 +279,6 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   ) => Promise<TModels[TModelName] | null>;
 };
 
-type PaginationOptions = { [k: string]: any };
-
 export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   fieldValue: typeof Op;
   QueryTypes?: QueryTypes;
@@ -298,6 +306,7 @@ export type DatabaseListWithPagination<
 > = {
   rows: DatabaseList<TModels, TModelName>;
   count: number;
+  pageInfo: { current: number; total: number };
 };
 
 //
@@ -608,10 +617,12 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       model.addHook(
         event,
-        `${modelName}${capitalize(event)}`,
+        `${String(modelName)}${capitalize(event)}`,
         async (instance: DatabaseHookModel, queryProps: any) => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
-            const w = `Constructor's name (${instance.constructor.name}) differs from "modelName" value (${modelName})`;
+            const w = `Constructor's name (${
+              instance.constructor.name
+            }) differs from "modelName" value (${String(modelName)})`;
             logger.warn(w);
             //
             afterCommit(instance, queryProps);
@@ -716,15 +727,27 @@ export async function initDatabase<TModels extends DatabaseModels>(
       return [res, true];
     },
     //
+    getListWithPageInfo<TModelName extends keyof TModels>(
+      list: Omit<DatabaseListWithPagination<TModels, TModelName>, 'pageInfo'> | null,
+      pagination: Pick<ListQueryOptions, 'limit' | 'offset'>,
+    ): DatabaseListWithPagination<TModels, TModelName> {
+      const { rows, count } = list ?? { rows: [], count: 0 };
+      const { limit, offset } = pagination;
+      return {
+        rows,
+        count,
+        pageInfo: { current: offset / limit, total: Math.ceil(count / limit) },
+      };
+    },
+    //
     async findAndCountAll<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: DatabaseTreeQueryOptions,
-    ) {
+      opts?: Omit<DatabaseTreeQueryOptions, 'throwErrorIfNotFound'>,
+    ): Promise<DatabaseListWithPagination<TModels, TModelName>> {
       //
       const {
         cachePolicy = 'no-cache',
         cachePeriod = 10000,
-        throwErrorIfNotFound = true,
         context,
         resolveInfo,
         raw,
@@ -735,8 +758,9 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
-      const cacheKey = `${modelName}_findAndCountAll_${stringify(queryOptions)}`;
+      const cacheKey = `${String(modelName)}_findAndCountAll_${stringify(queryOptions)}`;
       let cachedInstance: DatabaseListWithPagination<TModels, TModelName> | null = null;
+      const pagination = this.getListQueryOptions(pick(queryOptions, ['limit', 'offset']));
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -753,7 +777,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
             cachedInstance = null;
           }
           if (cachePolicy === 'cache-only') {
-            return cachedInstance || { rows: [], count: 0 };
+            return this.getListWithPageInfo(cachedInstance || { rows: [], count: 0 }, pagination);
           }
         } catch (err) {
           cachedInstance = null;
@@ -762,16 +786,9 @@ export async function initDatabase<TModels extends DatabaseModels>(
       }
       //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findAndCountAll' });
-      // if (cachedInstance && cachePolicy === 'cache-first') {
-      //   model
-      //     .findAndCountAll(p)
-      //     .then(res => {
-      //       redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
-      //     })
-      //     .catch(logger.error);
-      // }
 
-      const res = cachedInstance || (await model.findAndCountAll(p));
+      const res = (cachedInstance ||
+        (await model.findAndCountAll(p))) as DatabaseListWithPagination<TModels, TModelName>;
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
@@ -782,7 +799,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       }
       //
-      return res as DatabaseListWithPagination<TModels, TModelName>;
+      return this.getListWithPageInfo(res, pagination);
     },
     //
     async findAll<TModelName extends keyof TModels>(
@@ -804,7 +821,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
-      const cacheKey = `${modelName}_findAll_${stringify(queryOptions)}`;
+      const cacheKey = `${String(modelName)}_findAll_${stringify(queryOptions)}`;
       let cachedInstance: DatabaseList<TModels, TModelName> | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
@@ -871,7 +888,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
-      const cacheKey = `${modelName}_findOne_${opts?.cacheKey}`;
+      const cacheKey = `${String(modelName)}_findOne_${opts?.cacheKey}`;
       let cachedInstance: TModels[TModelName] | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
@@ -935,9 +952,12 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const { cachePeriod = 30000, throwErrorIfNotFound = true, resolveInfo, context } = opts || {};
       if (!id) {
         if (throwErrorIfNotFound) {
-          throw new DefaultError(`${modelName} with ID: "${id}" couldn't be found in database`, {
-            status: 404,
-          });
+          throw new DefaultError(
+            `${String(modelName)} with ID: "${id}" couldn't be found in database`,
+            {
+              status: 404,
+            },
+          );
         }
         return null;
       }
@@ -950,7 +970,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const model = models[modelName];
       //
-      const cacheKey = `${modelName}_findByPk_${id}`;
+      const cacheKey = `${String(modelName)}_findByPk_${id}`;
       let cachedInstance: TModels[TModelName] | null = null;
       if (cachePolicy !== 'no-cache') {
         try {
@@ -1006,7 +1026,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       return row;
     },
-    getListQueryOptions(props, defaults = {}) {
+    getListQueryOptions(props, defaults = {}): ListQueryOptions {
       //
       const pagination = get(props, 'pagination', get(defaults, 'pagination'));
       const limit = get(pagination, 'limit') || get(defaults, 'pagination.limit') || 150;
