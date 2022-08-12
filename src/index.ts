@@ -13,7 +13,6 @@ import {
   Options,
   DataTypes,
   Model,
-  ModelCtor,
   Order,
   Association,
   fn,
@@ -54,7 +53,6 @@ export {
   Optional,
   DataTypes,
   Model,
-  ModelCtor,
   Order,
   //
   BelongsToGetAssociationMixin,
@@ -88,12 +86,9 @@ export {
 
 export * from './helpers';
 
-// export interface ModelInstance<T> extends Model {
-//   publicFields: Set<string>;
-//   privateFields: Set<string>;
-//   associate: (models: DatabaseModels) => void;
-//   new (values?: unknown, options?: BuildOptions): T;
-// }
+// Type `ModelType` would basically wrap & satisfy the 'this' context of any sequelize helper methods
+type Constructor<T> = new (...args: any[]) => T;
+export type ModelType<T extends Model<T>> = Constructor<T> & typeof Model;
 
 export type DatabaseConnectionOptions = {
   engine?: Dialect;
@@ -118,7 +113,7 @@ export type DatabaseConnectionOptions = {
   minConnections?: number;
 };
 
-export type InitDatabaseOptions<TModels> = {
+export type InitDatabaseOptions<TModels extends DatabaseModels> = {
   models: TModels;
   migrationsPath?: string;
   sync?: boolean;
@@ -137,7 +132,7 @@ export type SortDirection = 'ASC' | 'DESC';
 export type DatabaseWhere = WhereOptions;
 export type DatabaseInclude = IncludeOptions;
 export type DatabaseModels = {
-  [k: string]: ModelCtor<Model>;
+  [k: string]: ModelType<Model>;
 };
 
 export interface DatabaseQueryOptions extends QueryOptions {
@@ -537,8 +532,6 @@ export async function initDatabase<TModels extends DatabaseModels>(
       models[modelName].associate(models);
     }
   });
-  // @ts-ignore
-  connection.models = models;
 
   // Checking DB connection
   await connection.authenticate();
@@ -625,7 +618,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
             }) differs from "modelName" value (${String(modelName)})`;
             logger.warn(w);
             //
-            afterCommit(instance, queryProps);
+            await afterCommit(instance, queryProps);
             return;
           }
           const { transaction } = queryProps || {};
