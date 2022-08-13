@@ -238,7 +238,7 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   getListQueryOptions(query: any, defaults?: any): ListQueryOptions;
   getListWithPageInfo<TModelName extends keyof TModels>(
     list: Omit<DatabaseListWithPagination<TModels, TModelName>, 'pageInfo'> | null,
-    pagination: Pick<ListQueryOptions, 'limit' | 'offset'>,
+    pagination: Pick<Partial<ListQueryOptions>, 'limit' | 'offset'>,
   ): DatabaseListWithPagination<TModels, TModelName>;
   getModelName: typeof getModelName;
   getTableName: typeof getTableName;
@@ -722,14 +722,16 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     getListWithPageInfo<TModelName extends keyof TModels>(
       list: Omit<DatabaseListWithPagination<TModels, TModelName>, 'pageInfo'> | null,
-      pagination: Pick<ListQueryOptions, 'limit' | 'offset'>,
+      pagination?: Pick<Partial<ListQueryOptions>, 'limit' | 'offset'>,
     ): DatabaseListWithPagination<TModels, TModelName> {
       const { rows, count } = list ?? { rows: [], count: 0 };
-      const { limit, offset } = pagination;
+      const { limit, offset } = connection.helpers.getListQueryOptions(pagination);
+      const currentPage = offset / limit || 1;
+      const totalPages = Math.ceil(count / limit);
       return {
         rows,
         count,
-        pageInfo: { current: offset / limit, total: Math.ceil(count / limit) },
+        pageInfo: { current: currentPage, total: totalPages },
       };
     },
     //
@@ -753,9 +755,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const cacheKey = `${String(modelName)}_findAndCountAll_${stringify(queryOptions)}`;
       let cachedInstance: DatabaseListWithPagination<TModels, TModelName> | null = null;
-      const pagination = connection.helpers.getListQueryOptions(
-        pick(queryOptions, ['limit', 'offset']),
-      );
+      const pagination = pick(queryOptions, ['limit', 'offset']);
       if (cachePolicy !== 'no-cache') {
         try {
           //
