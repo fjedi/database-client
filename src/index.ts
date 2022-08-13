@@ -169,6 +169,12 @@ export type ListQueryOptions = {
   order: [string, SortDirection][];
 };
 
+export type PaginationOptions = Pick<ListQueryOptions, 'limit' | 'offset'>;
+export type SortOptions = {
+  direction: SortDirection;
+  fields: string[];
+};
+
 ///
 /// HOOKS
 ///
@@ -235,7 +241,16 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
     options: DatabaseHookOptions,
   ) => void;
   afterCommitHook: typeof afterCommitHook;
-  getListQueryOptions(query: any, defaults?: any): ListQueryOptions;
+  getListQueryOptions(
+    options: {
+      pagination?: Partial<PaginationOptions>;
+      sort?: Partial<SortOptions>;
+    },
+    defaults?: {
+      pagination?: Partial<PaginationOptions>;
+      sort?: Partial<SortOptions>;
+    },
+  ): ListQueryOptions;
   getListWithPageInfo<TModelName extends keyof TModels>(
     list: Omit<DatabaseListWithPagination<TModels, TModelName>, 'pageInfo'> | null,
     pagination: Pick<Partial<ListQueryOptions>, 'limit' | 'offset'>,
@@ -725,7 +740,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       pagination?: Pick<Partial<ListQueryOptions>, 'limit' | 'offset'>,
     ): DatabaseListWithPagination<TModels, TModelName> {
       const { rows, count } = list ?? { rows: [], count: 0 };
-      const { limit, offset } = connection.helpers.getListQueryOptions(pagination);
+      const { limit, offset } = connection.helpers.getListQueryOptions({ pagination });
       const currentPage = offset / limit || 1;
       const totalPages = Math.ceil(count / limit);
       return {
