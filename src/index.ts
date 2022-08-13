@@ -753,7 +753,9 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const cacheKey = `${String(modelName)}_findAndCountAll_${stringify(queryOptions)}`;
       let cachedInstance: DatabaseListWithPagination<TModels, TModelName> | null = null;
-      const pagination = this.getListQueryOptions(pick(queryOptions, ['limit', 'offset']));
+      const pagination = connection.helpers.getListQueryOptions(
+        pick(queryOptions, ['limit', 'offset']),
+      );
       if (cachePolicy !== 'no-cache') {
         try {
           //
@@ -770,7 +772,10 @@ export async function initDatabase<TModels extends DatabaseModels>(
             cachedInstance = null;
           }
           if (cachePolicy === 'cache-only') {
-            return this.getListWithPageInfo(cachedInstance || { rows: [], count: 0 }, pagination);
+            return connection.helpers.getListWithPageInfo(
+              cachedInstance || { rows: [], count: 0 },
+              pagination,
+            );
           }
         } catch (err) {
           cachedInstance = null;
@@ -792,7 +797,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       }
       //
-      return this.getListWithPageInfo(res, pagination);
+      return connection.helpers.getListWithPageInfo(res, pagination);
     },
     //
     async findAll<TModelName extends keyof TModels>(
