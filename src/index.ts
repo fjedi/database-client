@@ -741,7 +741,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     ): DatabaseListWithPagination<TModels, TModelName> {
       const { rows, count } = list ?? { rows: [], count: 0 };
       const { limit, offset } = connection.helpers.getListQueryOptions({ pagination });
-      const currentPage = offset / limit || 1;
+      const currentPage = offset / limit + 1;
       const totalPages = Math.ceil(count / limit);
       return {
         rows,
