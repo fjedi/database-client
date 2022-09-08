@@ -316,7 +316,7 @@ export type DatabaseListWithPagination<
 > = {
   rows: DatabaseList<TModels, TModelName>;
   count: number;
-  pageInfo: { current: number; total: number };
+  pageInfo: { current: number; total: number; hasPreviousPage: boolean; hasNextPage: boolean };
 };
 
 //
@@ -743,10 +743,12 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const { limit, offset } = connection.helpers.getListQueryOptions({ pagination });
       const currentPage = offset / limit + 1;
       const totalPages = Math.ceil(count / limit);
+      const hasNextPage = currentPage < totalPages;
+      const hasPreviousPage = currentPage > 1;
       return {
         rows,
         count,
-        pageInfo: { current: currentPage, total: totalPages },
+        pageInfo: { current: currentPage, total: totalPages, hasPreviousPage, hasNextPage },
       };
     },
     //
