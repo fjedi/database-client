@@ -448,13 +448,13 @@ function queryBuilder<TModels extends DatabaseModels>(
     queryParams.attributes = uniq(attributes);
 
     if (Array.isArray(queryParams.order)) {
-      queryParams.order.forEach((o: [any, SortDirection]) => {
-        const [
-          field,
-          // direction,
-        ] = o;
-        if (typeof field === 'string') {
-          queryParams.attributes.push(field);
+      queryParams.order.forEach((o: any[]) => {
+        // if o.length === 3, o has following structure [association, field, direction]
+        if (o.length < 3) {
+          const [field] = o;
+          if (typeof field === 'string') {
+            queryParams.attributes.push(field);
+          }
         }
       });
     }
