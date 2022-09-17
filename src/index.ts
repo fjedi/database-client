@@ -449,7 +449,10 @@ function queryBuilder<TModels extends DatabaseModels>(
 
     if (Array.isArray(queryParams.order)) {
       queryParams.order.forEach((o: any[]) => {
-        // if o.length === 3, o has following structure [association, field, direction]
+        // usually `o` structure looks like [field, direction]
+        // but if we want to sort by associated field, `o` has 3 elements
+        // and its structure looks like [association, field, direction]
+        // and in this case we shouldn't add it to queryParams, because it's not trivial
         if (o.length < 3) {
           const [field] = o;
           if (typeof field === 'string') {
