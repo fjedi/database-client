@@ -448,13 +448,13 @@ function queryBuilder<TModels extends DatabaseModels>(
     queryParams.attributes = uniq(attributes);
 
     if (Array.isArray(queryParams.order)) {
-      queryParams.order.forEach((o: [any, SortDirection]) => {
-        const [
-          field,
-          // direction,
-        ] = o;
-        if (typeof field === 'string') {
-          queryParams.attributes.push(field);
+      queryParams.order.forEach((o: any[]) => {
+        // if o.length === 3, o has following structure [association, field, direction]
+        if (o.length < 3) {
+          const [field] = o;
+          if (typeof field === 'string') {
+            queryParams.attributes.push(field);
+          }
         }
       });
     }
@@ -628,9 +628,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
         `${String(modelName)}${capitalize(event)}`,
         async (instance: DatabaseHookModel, queryProps: any) => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
-            const w = `Constructor's name (${
-              instance.constructor.name
-            }) differs from "modelName" value (${String(modelName)})`;
+            const w = `Constructor's name (${instance.constructor.name
+              }) differs from "modelName" value (${String(modelName)})`;
             logger.warn(w);
             //
             await afterCommit(instance, queryProps);
