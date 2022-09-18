@@ -5,7 +5,10 @@
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "files": [
-    "lib/"
+    "lib/",
+    "scr/",
+    "tsconfig.json",
+    "tsconfig-cjs.json"
   ],
   "private": false,
   "scripts": {
