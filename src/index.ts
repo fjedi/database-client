@@ -54,6 +54,7 @@ export {
   DataTypes,
   Model,
   Order,
+  OrderItem,
   //
   BelongsToGetAssociationMixin,
   BelongsToSetAssociationMixin,
@@ -402,7 +403,7 @@ function queryBuilder<TModels extends DatabaseModels>(
   const model = connection.models[modelName];
   const dataloaderContext = get(context, 'state.dataloaderContext', {});
 
-  const queryParams = {
+  const queryParams: DatabaseQueryOptions = {
     ...dataloaderContext,
     // logging: process.env.NODE_ENV === 'development' ? console.log : undefined,
     ...bypassParams,
@@ -419,10 +420,19 @@ function queryBuilder<TModels extends DatabaseModels>(
     });
     // @ts-ignore
     const indexes: Array<{ fields: string[] }> = get(model, '_indexes', []);
+    // @ts-ignore
+    const tableAttributes = model.tableAttributes as Record<
+      string,
+      { references?: { model: string; key: string } }
+    >;
     const indexFields: string[] = flatten(indexes.map((i) => i.fields));
+    const foreignKeys: string[] = Object.keys(tableAttributes).filter(
+      (field) => tableAttributes[field].references,
+    );
     //
     attributes.push(
       ...model.primaryKeyAttributes,
+      ...foreignKeys,
       ...indexFields,
       ...(model.options.timestamps ? ['createdAt', 'updatedAt'] : []),
       ...(model.options.paranoid ? ['deletedAt'] : []),
@@ -448,14 +458,14 @@ function queryBuilder<TModels extends DatabaseModels>(
     queryParams.attributes = uniq(attributes);
 
     if (Array.isArray(queryParams.order)) {
-      queryParams.order.forEach((o: any[]) => {
+      queryParams.order.forEach((o) => {
         // usually `o` structure looks like [field, direction]
         // but if we want to sort by associated field, `o` has 3 elements
         // and its structure looks like [association, field, direction]
         // and in this case we shouldn't add it to queryParams, because it's not trivial
-        if (o.length < 3) {
+        if (Array.isArray(o) && o.length < 3) {
           const [field] = o;
-          if (typeof field === 'string') {
+          if (typeof field === 'string' && Array.isArray(queryParams.attributes)) {
             queryParams.attributes.push(field);
           }
         }
@@ -810,6 +820,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
+        // @ts-ignore
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(res.rows);
       }
       //
@@ -878,6 +889,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
+        // @ts-ignore
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(rows);
       }
       //
@@ -956,6 +968,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
+        // @ts-ignore
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(row);
       }
       //
@@ -1037,8 +1050,9 @@ export async function initDatabase<TModels extends DatabaseModels>(
       if (cachePolicy !== 'no-cache') {
         redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
       }
+      // @ts-ignore
       if (dataloaderContext && dataloaderContext[EXPECTED_OPTIONS_KEY]) {
-        //
+        // @ts-ignore
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(row);
       }
       //
