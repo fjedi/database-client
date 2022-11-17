@@ -1,6 +1,6 @@
 import { resolve as resolvePath } from 'path';
 import { Sequelize } from 'sequelize';
-import Migrator, { Umzug, UmzugOptions, Migration } from 'umzug';
+import { Umzug, SequelizeStorage, MigrationMeta } from 'umzug';
 import { logger } from '@fjedi/logger';
 
 export type MigrateCommand =
@@ -13,93 +13,55 @@ export type MigrateCommand =
   | 'reset'
   | 'reset-prev';
 
-function logUmzugEvent(eventName: string) {
-  return (name: string, migration?: Migration) => {
-    logger.info(`${name} ${eventName}`);
-  };
-}
-
-type MigrationOptions = {
-  migrator: Umzug;
-  seeder: Umzug;
-};
-
-type GetUmzugConfigParams = {
-  sequelize: Sequelize;
-  modelName?: string;
-  path: string;
-};
-
-async function cmdMigrate(opts: MigrationOptions) {
-  const { migrator, seeder } = opts;
-  return migrator.up().then(() => seeder.up());
-}
-
-async function cmdReset(opts: MigrationOptions) {
-  const { migrator, seeder } = opts;
-  return seeder.down({ to: 0 }).then(() => migrator.down({ to: 0 }));
-}
-
-function genUmzugConfig(params: GetUmzugConfigParams): UmzugOptions {
-  const { sequelize, modelName, path: filePath } = params;
-  return {
-    storage: 'sequelize',
-    storageOptions: {
-      sequelize,
-      modelName: modelName || 'SequelizeMeta',
-    },
-
-    // see: https://github.com/sequelize/umzug/issues/17
-    migrations: {
-      params: [
-        sequelize.getQueryInterface(), // queryInterface
-        sequelize.constructor, // DataTypes
-        () => {
-          throw new Error(
-            'Migration tried to use old style "done" callback. Please upgrade to "umzug" and return a promise instead.',
-          );
-        },
-      ],
-      path: filePath,
-      pattern: /\.(j|t)s$/,
-    },
-
-    logging() {},
-  };
-}
-
 export default async function runMigrations(
   sequelizeInstance: Sequelize,
   cmd: MigrateCommand,
-  path: string,
+  migrationsPath: string,
 ): Promise<void> {
-  const migrator = new Migrator(
-    genUmzugConfig({
-      sequelize: sequelizeInstance,
-      path: resolvePath(path, 'migrations'),
-    }),
-  );
-  const seedPath = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
-  const seeder = new Migrator(
-    genUmzugConfig({
-      sequelize: sequelizeInstance,
-      modelName: 'SequelizeSeeds',
-      path: resolvePath(path, 'seeds', seedPath),
-    }),
-  );
+  const migrator = new Umzug({
+    context: sequelizeInstance.getQueryInterface(),
+    storage: new SequelizeStorage({ sequelize: sequelizeInstance }),
+    logger: console,
+    migrations: {
+      glob: resolvePath(migrationsPath, 'migrations/*.{js.ts}'),
+      resolve: ({ name, path, context }) => {
+        if (!path) {
+          logger.warn('Invalid "path" passed to db-migration', { name, path, context });
+          return {
+            name,
+            up() {
+              return Promise.resolve();
+            },
+            down() {
+              return Promise.resolve();
+            },
+          };
+        }
+        // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require, import/no-dynamic-require
+        const migration = require(path);
+        return {
+          // adjust the parameters Umzug will
+          // pass to migration methods when called
+          name,
+          up: async () => migration.up(context, Sequelize),
+          down: async () => migration.down(context, Sequelize),
+        };
+      },
+    },
+  });
 
-  migrator.on('migrating', logUmzugEvent('migrating'));
-  migrator.on('migrated', logUmzugEvent('migrated'));
-  migrator.on('reverting', logUmzugEvent('reverting'));
-  migrator.on('reverted', logUmzugEvent('reverted'));
+  migrator.on('migrating', logger.info);
+  migrator.on('migrated', logger.info);
+  migrator.on('reverting', logger.info);
+  migrator.on('reverted', logger.info);
 
-  let executedCmd: Promise<Migration[]> | null = null;
+  let executedCmd: Promise<MigrationMeta[]> | null = null;
   logger.info(`DB-MIGRATION ${cmd.toUpperCase()} BEGIN`);
   //
   switch (cmd) {
     case 'up':
     case 'migrate':
-      executedCmd = cmdMigrate({ migrator, seeder });
+      executedCmd = migrator.up();
       break;
 
     case 'next':
@@ -109,7 +71,7 @@ export default async function runMigrations(
 
     case 'down':
     case 'reset':
-      executedCmd = cmdReset({ migrator, seeder });
+      executedCmd = migrator.down();
       break;
 
     case 'prev':

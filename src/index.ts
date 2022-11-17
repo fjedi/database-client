@@ -96,8 +96,8 @@ export type DatabaseConnectionOptions = {
   storage?: 'mysql' | 'postgres';
   host?: string;
   port?: number;
-  name?: string;
-  user?: string;
+  name: string;
+  user: string;
   password?: string;
   timezone?: string;
   /**
@@ -490,10 +490,10 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
     minConnections,
   } = options;
   //
-  if (!name || typeof name !== 'string') {
+  if (!name) {
     throw new Error("'name' is a required param to init database connection");
   }
-  if (!user || typeof user !== 'string') {
+  if (!user) {
     throw new Error("'user' is a required param to init database connection");
   }
   if (maxConnections <= 10) {
@@ -587,7 +587,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         //
         if (association) {
           //
-          const { target: model, associationType } = association as Association;
+          const { target: model, associationType } = association as unknown as Association;
 
           // Disable recursive db-query as model.findAndCountAll works improperly with pagination
           const disabledNestedInclude =
@@ -694,10 +694,10 @@ export async function initDatabase<TModels extends DatabaseModels>(
       );
     },
     //
-    async wrapInTransaction(
-      action: (transaction: Transaction) => Promise<any>,
+    async wrapInTransaction<T = void>(
+      action: (transaction: Transaction) => Promise<T>,
       opts?: DatabaseTransactionProps,
-    ): Promise<void> {
+    ): Promise<T> {
       const { isolationLevel, autocommit = false } = opts || {};
       // If no parent transaction has been passed inside "opts"
       // init new transaction
@@ -731,7 +731,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async findOrCreate<TModelName extends keyof TModels>(
       modelName: keyof TModels,
       where: DatabaseWhere,
-      defaults: { [k: string]: any },
+      defaults: Record<string, any>,
       opts?: DatabaseQueryOptions,
     ) {
       //
