@@ -17,8 +17,8 @@ const options: DatabaseConnectionOptions = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(`${process.env.DB_PORT}`, 10) || 3306,
   engine: 'mysql',
-  name: process.env.DB_NAME || process.env.DB_USER,
-  user: process.env.DB_USER,
+  name: process.env.DB_NAME || process.env.DB_USER || 'db_name',
+  user: process.env.DB_USER || 'db_user',
   password: process.env.DB_PASSWORD || undefined,
 };
 
