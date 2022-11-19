@@ -1,6 +1,6 @@
 import { resolve as resolvePath } from 'path';
-import { Sequelize } from 'sequelize';
-import { Umzug, SequelizeStorage, MigrationMeta } from 'umzug';
+import { QueryInterface, Sequelize } from 'sequelize';
+import { Umzug, SequelizeStorage, MigrationMeta, MigrationParams } from 'umzug';
 import { logger } from './helpers';
 
 export type MigrateCommand =
@@ -12,6 +12,15 @@ export type MigrateCommand =
   | 'prev'
   | 'reset'
   | 'reset-prev';
+
+export type MigrationEvent = 'migrated' | 'reverted' | 'migrating' | 'reverting';
+
+export function migrationLogger(eventName: MigrationEvent) {
+  return (eventData: MigrationParams<QueryInterface> & { durationSeconds?: number }) => {
+    const { name, path, durationSeconds } = eventData;
+    logger.info(eventName, { name, path, durationSeconds });
+  };
+}
 
 export default async function runMigrations(
   sequelizeInstance: Sequelize,
@@ -50,14 +59,10 @@ export default async function runMigrations(
     },
   });
 
-  // eslint-disable-next-line no-console
-  migrator.on('migrating', console.log);
-  // eslint-disable-next-line no-console
-  migrator.on('migrated', console.log);
-  // eslint-disable-next-line no-console
-  migrator.on('reverting', console.log);
-  // eslint-disable-next-line no-console
-  migrator.on('reverted', console.log);
+  const migrationEvents: MigrationEvent[] = ['migrating', 'migrated', 'reverting', 'reverted'];
+  migrationEvents.forEach((eventName) => {
+    migrator.on('migrating', migrationLogger(eventName));
+  });
 
   let executedCmd: Promise<MigrationMeta[]> | null = null;
   logger.info(`DB-MIGRATION ${cmd.toUpperCase()} BEGIN`);
