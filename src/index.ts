@@ -28,13 +28,12 @@ import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
 import getQueryFields from 'graphql-list-fields';
 import { stringify, parse } from 'json-buffer';
 import shimmer from 'shimmer';
-import { logger as rootLogger } from '@fjedi/logger';
 import { redis, RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
 //
 import runMigrations from './migrate';
 //
-import { getModelName, getTableName, filterByField, afterCommitHook } from './helpers';
+import { getModelName, getTableName, filterByField, afterCommitHook, logger } from './helpers';
 
 export {
   Sequelize,
@@ -319,9 +318,6 @@ export type DatabaseListWithPagination<
   count: number;
   pageInfo: { current: number; total: number; hasPreviousPage: boolean; hasNextPage: boolean };
 };
-
-//
-const logger = rootLogger.child({ module: 'DATABASE' });
 
 export function databaseQueryLogger(query: string, params: any): void {
   const { bind } = params;

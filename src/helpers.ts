@@ -3,6 +3,10 @@ import snakeCase from 'lodash/snakeCase';
 import camelCase from 'lodash/camelCase';
 import upperFirst from 'lodash/upperFirst';
 import compact from 'lodash/compact';
+import { logger as rootLogger } from '@fjedi/logger';
+
+//
+export const logger = rootLogger.child({ module: 'DATABASE' });
 
 // Custom Tables' names (if we need to override filename-based naming
 const dbTables: { [k: string]: any } = {};

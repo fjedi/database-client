@@ -1,7 +1,7 @@
 import { resolve as resolvePath } from 'path';
 import { Sequelize } from 'sequelize';
 import { Umzug, SequelizeStorage, MigrationMeta } from 'umzug';
-import { logger } from '@fjedi/logger';
+import { logger } from './helpers';
 
 export type MigrateCommand =
   | 'up'
@@ -26,7 +26,7 @@ export default async function runMigrations(
       glob: resolvePath(migrationsPath, 'migrations/*.{js,ts}'),
       resolve: ({ name, path, context }) => {
         if (!path) {
-          logger.warn('Invalid "path" passed to db-migration', { name, path, context });
+          logger.warn('Invalid "path" passed to db-migration', { name, path });
           return {
             name,
             up() {
@@ -50,10 +50,14 @@ export default async function runMigrations(
     },
   });
 
-  migrator.on('migrating', logger.info);
-  migrator.on('migrated', logger.info);
-  migrator.on('reverting', logger.info);
-  migrator.on('reverted', logger.info);
+  // eslint-disable-next-line no-console
+  migrator.on('migrating', console.log);
+  // eslint-disable-next-line no-console
+  migrator.on('migrated', console.log);
+  // eslint-disable-next-line no-console
+  migrator.on('reverting', console.log);
+  // eslint-disable-next-line no-console
+  migrator.on('reverted', console.log);
 
   let executedCmd: Promise<MigrationMeta[]> | null = null;
   logger.info(`DB-MIGRATION ${cmd.toUpperCase()} BEGIN`);
