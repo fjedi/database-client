@@ -23,7 +23,7 @@ export default async function runMigrations(
     storage: new SequelizeStorage({ sequelize: sequelizeInstance }),
     logger: console,
     migrations: {
-      glob: resolvePath(migrationsPath, 'migrations/*.{js.ts}'),
+      glob: resolvePath(migrationsPath, 'migrations/*.{js,ts}'),
       resolve: ({ name, path, context }) => {
         if (!path) {
           logger.warn('Invalid "path" passed to db-migration', { name, path, context });
