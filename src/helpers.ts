@@ -26,7 +26,16 @@ export function getTableName(key: string, prefix?: string): string {
   return `${prefix || ''}${snakeCase(key)}`;
 }
 
-export type CompareType = 'like' | 'notLike' | 'in' | 'notIn' | 'eq' | 'ne' | 'timeRange';
+export type CompareType =
+  | 'like'
+  | 'iLike'
+  | 'notLike'
+  | 'notILike'
+  | 'in'
+  | 'notIn'
+  | 'eq'
+  | 'ne'
+  | 'timeRange';
 
 export type TimeRangeType = { from?: string | Date; to?: string | Date };
 
@@ -105,7 +114,7 @@ export function filterByField(
     // @ts-ignore
     // eslint-disable-next-line no-param-reassign
     where[field] = {
-      [compareSymbol]: compareType === 'like' ? `%${values}%` : values,
+      [compareSymbol]: compareType === 'like' || compareType === 'iLike' ? `%${values}%` : values,
     };
   } else if (Array.isArray(values) && compact(values).length > 0) {
     // @ts-ignore
@@ -119,7 +128,7 @@ export function filterByField(
         where[field] = {
           [compareSymbol]: v,
         };
-      } else if (compareType === 'like') {
+      } else if (compareType === 'like' || compareType === 'iLike') {
         // @ts-ignore
         // eslint-disable-next-line no-param-reassign
         where[field] = {
