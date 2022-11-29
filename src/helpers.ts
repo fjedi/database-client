@@ -114,7 +114,9 @@ export function filterByField(
     // @ts-ignore
     // eslint-disable-next-line no-param-reassign
     where[field] = {
-      [compareSymbol]: compareType === 'like' || compareType === 'iLike' ? `%${values}%` : values,
+      [compareSymbol]: ['like', 'iLike', 'notLike', 'notILike'].includes(compareType)
+        ? `%${values}%`
+        : values,
     };
   } else if (Array.isArray(values) && compact(values).length > 0) {
     // @ts-ignore
