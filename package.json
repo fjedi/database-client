@@ -50,7 +50,7 @@
     "graphql-list-fields": "2.0.2",
     "json-buffer": "3.0.1",
     "lodash": "4.17.21",
-    "sequelize": "6.28.0",
+    "sequelize": "6.28.1",
     "sequelize-cli": "6.6.0",
     "shimmer": "1.2.1",
     "umzug": "3.2.1"
