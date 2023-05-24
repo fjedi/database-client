@@ -50,7 +50,7 @@ export type CompareValues =
 export function getCompareSymbol(
   compareType: CompareType,
   vals: CompareValues,
-): typeof Op[keyof typeof Op] {
+): (typeof Op)[keyof typeof Op] {
   let symbol: keyof typeof Op;
   //
   if (compareType === 'timeRange') {
