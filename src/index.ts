@@ -153,8 +153,11 @@ export type DatabaseModels = {
     associate: () => ModelStatic<Model>;
   };
 };
-export interface DatabaseQueryOptions<T extends Attributes<Model> = Attributes<Model>>
-  extends FindOptions<T> {
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DefaultWhereSchema = any;
+
+export interface DatabaseQueryOptions<T = DefaultWhereSchema> extends FindOptions<T> {
   where?: DatabaseWhere<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
@@ -162,8 +165,7 @@ export interface DatabaseQueryOptions<T extends Attributes<Model> = Attributes<M
   context?: unknown;
   attributes?: (string | ProjectionAlias)[];
 }
-export interface DatabaseTreeQueryOptions<T extends Attributes<Model> = Attributes<Model>>
-  extends DatabaseQueryOptions<T> {
+export interface DatabaseTreeQueryOptions<T = DefaultWhereSchema> extends DatabaseQueryOptions<T> {
   resolveInfo?: GraphQLResolveInfo;
   relationKeysMap?: Map<string, string>;
 }
@@ -288,26 +290,26 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   createDatabaseContext: (p: unknown) => unknown;
   findAndCountAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions<TModels[TModelName]>,
+    o: DatabaseTreeQueryOptions,
   ) => Promise<DatabaseListWithPagination<TModels, TModelName>>;
   findAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions<TModels[TModelName]>,
+    o: DatabaseTreeQueryOptions,
   ) => Promise<DatabaseList<TModels, TModelName>>;
   findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
+    o: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
   findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     where: DatabaseWhere,
     defaults: MakeNullishOptional<TModels[TModelName]>,
-    opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
+    opts?: DatabaseTreeQueryOptions,
   ) => Promise<[Model<TModels[TModelName]>, boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     id: DatabaseRowID | null | undefined,
-    opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
+    opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
 };
 
@@ -366,12 +368,12 @@ export function databaseQueryLogger(query: string, params: unknown): void {
     order,
     raw,
     plain,
-  } = params as DatabaseQueryOptions & {
+  } = params as DatabaseQueryOptions<unknown> & {
     model?: Model;
     hooks?: boolean;
     tableNames?: string[];
     rejectOnEmpty?: boolean;
-    originalAttributes?: DatabaseQueryOptions['attributes'];
+    originalAttributes?: DatabaseQueryOptions<unknown>['attributes'];
   };
   return logger.info(query, {
     type,
@@ -392,7 +394,7 @@ export function databaseQueryLogger(query: string, params: unknown): void {
 function queryBuilder<TModels extends DatabaseModels>(
   connection: DatabaseConnection<TModels>,
   modelName: keyof TModels,
-  opts: DatabaseTreeQueryOptions & {
+  opts: DatabaseTreeQueryOptions<unknown> & {
     query: 'findAndCountAll' | 'findAll' | 'findOne' | 'dbInstanceById';
   },
 ) {
@@ -408,7 +410,7 @@ function queryBuilder<TModels extends DatabaseModels>(
   const model = connection.models[modelName];
   const dataloaderContext = get(context, 'state.dataloaderContext', {});
 
-  const queryParams: DatabaseQueryOptions = {
+  const queryParams: DatabaseQueryOptions<unknown> = {
     ...dataloaderContext,
     // logging: process.env.NODE_ENV === 'development' ? console.log : undefined,
     ...bypassParams,
@@ -754,7 +756,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAndCountAll<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
+      opts?: DatabaseTreeQueryOptions,
     ): Promise<DatabaseListWithPagination<TModels, TModelName>> {
       //
       const { context, resolveInfo, raw, relationKeysMap, ...queryOptions } = opts || {};
@@ -779,7 +781,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAll<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
+      opts?: DatabaseTreeQueryOptions,
     ) {
       const { context, raw } = opts || {};
       //
@@ -798,7 +800,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     },
     async findOne<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
+      opts: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
     ) {
       const { context, raw } = opts || {};
       //
@@ -825,7 +827,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async dbInstanceById<TModelName extends keyof TModels>(
       modelName: keyof TModels,
       id: DatabaseRowID | null | undefined,
-      opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
+      opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
     ) {
       const { rejectOnEmpty = true, context } = opts || {};
       if (!id) {
