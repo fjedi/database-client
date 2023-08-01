@@ -155,9 +155,11 @@ export function createRangeFilter(range: RangeFilterValue): WhereOperators {
 
 export function filterByField(
   where: WhereAttributeHash,
-  params: FilterParams & { field: string },
+  field: string,
+  values: FilterParams['values'],
+  compareType: FilterParams['compareType'],
+  params: Omit<FilterParams, 'values' | 'compareType'>,
 ): void {
-  const { field, values, compareType } = params;
   if (compareType === 'numberRange') {
     if (!values) {
       return;
@@ -174,5 +176,9 @@ export function filterByField(
     where[field] = createRangeFilter({ min: from, max: to });
     return;
   }
-  where[field] = createFilter(params);
+  where[field] = createFilter({
+    ...params,
+    values,
+    compareType,
+  });
 }
