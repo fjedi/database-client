@@ -23,17 +23,15 @@ import {
   IncludeOptions,
   FindOptions,
 } from 'sequelize';
+import { MakeNullishOptional } from 'sequelize/types/utils';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
 import getQueryFields from 'graphql-list-fields';
 import type { GraphQLResolveInfo } from 'graphql';
-import { redis, RedisClient } from '@fjedi/redis-client';
+import { RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
-//
 import runMigrations from './migrate';
-//
 import { getModelName, getTableName, filterByField, logger } from './helpers';
-import { MakeNullishOptional } from 'sequelize/types/utils';
 
 export type {
   Transaction,
@@ -323,7 +321,7 @@ export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   json: typeof json;
   models: TModels;
   helpers: DatabaseHelpers<TModels>;
-  redis: RedisClient;
+  redis?: RedisClient;
 };
 
 export type DatabaseList<TModels extends DatabaseModels, TModelName extends keyof TModels> = Model<
@@ -672,13 +670,6 @@ export async function initDatabase<TModels extends DatabaseModels>(
               instance.newValues = { ...dataValues };
             }
           }
-          if (event.includes('Destroy') || event.includes('Update')) {
-            // Remove instance from cache
-            // @ts-ignore
-            await redis.delAsync(`${modelName}_findByPk_${instance.id}`);
-          }
-
-          //
           if (transaction && typeof beforeCommit === 'function') {
             await beforeCommit(instance, { ...queryProps, transaction });
           }
@@ -901,6 +892,5 @@ export async function initDatabase<TModels extends DatabaseModels>(
     }
   }
 
-  // @ts-ignore
   return connection;
 }
