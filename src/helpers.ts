@@ -1,4 +1,12 @@
-import { WhereOptions, Op, Transaction } from 'sequelize';
+import {
+  WhereOptions,
+  WhereOperators,
+  Op,
+  Transaction,
+  OrOperator,
+  WhereAttributeHash,
+  WhereAttributeHashValue,
+} from 'sequelize';
 import snakeCase from 'lodash/snakeCase';
 import camelCase from 'lodash/camelCase';
 import upperFirst from 'lodash/upperFirst';
@@ -35,9 +43,12 @@ export type CompareType =
   | 'notIn'
   | 'eq'
   | 'ne'
+  | 'numberRange'
   | 'timeRange';
 
 export type TimeRangeType = { from?: string | Date; to?: string | Date };
+
+export type NumberRangeType = { min?: number; max?: number };
 
 export type CompareValues =
   | string
@@ -46,21 +57,28 @@ export type CompareValues =
   | number[]
   | Array<string | number>
   | TimeRangeType
+  | NumberRangeType
   | undefined
   | undefined[]
   | null[]
   | null;
+
+export type FilterParams = {
+  values: CompareValues;
+  compareType: CompareType;
+  arrayOperator?: 'AND' | 'OR';
+};
 
 export function getCompareSymbol(
   compareType: CompareType,
   vals: CompareValues,
 ): (typeof Op)[keyof typeof Op] {
   let symbol: keyof typeof Op;
-  //
-  if (compareType === 'timeRange') {
+
+  if (compareType === 'timeRange' || compareType === 'numberRange') {
     throw new Error('Invalid usage of "getCompareSymbol" helper');
   }
-  //
+
   switch (compareType) {
     case 'in':
       symbol = !Array.isArray(vals) || vals.length === 1 ? 'eq' : compareType;
@@ -75,90 +93,103 @@ export function getCompareSymbol(
   return Op[symbol];
 }
 
-export function filterByField(
-  where: WhereOptions,
-  field: string,
-  values: CompareValues,
-  compareType: CompareType,
-): void {
-  //
-  if (compareType === 'timeRange') {
-    if (!values) {
-      return;
-    }
-    const { from, to } = values as TimeRangeType;
-    if (from && to) {
-      // @ts-ignore
-      // eslint-disable-next-line no-param-reassign
-      where[field] = {
-        [Op.between]: [from, to],
-      };
-    } else if (from) {
-      // @ts-ignore
-      // eslint-disable-next-line no-param-reassign
-      where[field] = {
-        [Op.gte]: from,
-      };
-    } else if (to) {
-      // @ts-ignore
-      // eslint-disable-next-line no-param-reassign
-      where[field] = {
-        [Op.lte]: to,
-      };
-    }
-    return;
+export function createFilter(params: FilterParams): WhereOperators | OrOperator {
+  const { values, compareType } = params;
+  if (compareType === 'timeRange' || compareType === 'numberRange') {
+    throw new Error(`To filter by date- or number range, use "createRangeFilter" helper`);
   }
-  //
   if (
     values === null ||
     (typeof values === 'string' && values.length > 0) ||
     typeof values === 'number'
   ) {
     const compareSymbol = getCompareSymbol(compareType, values);
-    // @ts-ignore
-    // eslint-disable-next-line no-param-reassign
-    where[field] = {
+    return {
       [compareSymbol]: ['like', 'iLike', 'notLike', 'notILike'].includes(compareType)
         ? `%${values}%`
         : values,
     };
   } else if (Array.isArray(values) && compact(values).length > 0) {
-    // @ts-ignore
     const vals = compact(values);
     if (vals.length > 0) {
+      const arrayOperator = params?.arrayOperator || 'OR';
+      const arrayOperatorSymbol = arrayOperator === 'OR' ? Op.or : Op.and;
       if (compareType === 'in' || compareType === 'notIn') {
         const v = Array.isArray(vals) && vals.length === 1 ? vals[0] : vals;
         const compareSymbol = getCompareSymbol(compareType, v);
-        // @ts-ignore
-        // eslint-disable-next-line no-param-reassign
-        where[field] = {
+        return {
           [compareSymbol]: v,
         };
       } else if (compareType === 'like' || compareType === 'iLike') {
-        // @ts-ignore
-        // eslint-disable-next-line no-param-reassign
-        where[field] = {
-          [Op.or]: vals.map((v) => ({
+        return {
+          [arrayOperatorSymbol]: vals.map((v) => ({
             [Op[compareType]]: `%${v}%`,
           })),
         };
       } else {
-        // @ts-ignore
-        // eslint-disable-next-line no-param-reassign
-        where[field] = {
-          [Op.or]: vals.map((v) => ({
+        return {
+          [arrayOperatorSymbol]: vals.map((v) => ({
             [Op[compareType]]: v,
           })),
         };
       }
     }
   }
+  return {};
+}
+
+export type RangeFilterValue =
+  | {
+      min?: number;
+      max?: number;
+    }
+  | {
+      min?: TimeRangeType['from'];
+      max?: TimeRangeType['to'];
+    };
+
+export function createRangeFilter(range: RangeFilterValue): WhereOperators {
+  const { min, max } = range;
+  if (typeof min !== 'undefined' && typeof max !== 'undefined') {
+    return { [Op.between]: [min, max] };
+  }
+  if (typeof min !== 'undefined') {
+    return { [Op.gte]: min };
+  }
+  if (typeof max !== 'undefined') {
+    return { [Op.lte]: max };
+  }
+  return {};
+}
+
+export function filterByField(
+  where: WhereAttributeHash,
+  params: FilterParams & { field: string },
+): void {
+  const { field, values, compareType } = params;
+  if (compareType === 'numberRange') {
+    if (!values) {
+      return;
+    }
+    const { min, max } = values as NumberRangeType;
+    where[field] = createRangeFilter({ min, max });
+    return;
+  }
+  if (compareType === 'timeRange') {
+    if (!values) {
+      return;
+    }
+    const { from, to } = values as TimeRangeType;
+    where[field] = createRangeFilter({ min: from, max: to });
+    return;
+  }
+  where[field] = createFilter(params);
 }
 
 // Used as an 'invisible' property on transaction objects,
 // used to stored "after*" hook functions that should only run if the transaction actually commits successfully
 const transHooks = Symbol('afterCommitHooks');
-export function afterCommitHook(transaction: Transaction, hookFn: () => any): void {
+export function afterCommitHook(transaction: Transaction, hookFn: () => unknown): void {
   if (typeof hookFn !== 'function') return;
   if (!transaction) {
     hookFn();
