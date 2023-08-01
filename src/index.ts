@@ -153,8 +153,8 @@ export class DatabaseModel<
   TCreationAttributes extends NonNullable<unknown> = TModelAttributes,
 > extends Model<TModelAttributes, TCreationAttributes> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  initModel(_db: Sequelize, _tableName: string): void {}
-  associate(): void {}
+  static initModel(_db: Sequelize, _tableName: string): void {}
+  static associate(): void {}
 }
 
 type NonConstructorKeys<T> = {
@@ -164,9 +164,6 @@ type NonConstructor<T> = Pick<T, NonConstructorKeys<T>>;
 
 export type ModelStatic<M extends DatabaseModel> = NonConstructor<typeof DatabaseModel> & {
   new (): M;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  initModel(_db: Sequelize, _tableName: string): void;
-  associate(): void;
 };
 
 export type DatabaseModels = {
@@ -213,7 +210,7 @@ type DatabaseHookModelFields = {
   [key: string]: unknown;
 };
 
-export type DatabaseHookModel<T extends Model = Model> = T & {
+export type DatabaseHookModel<T extends DatabaseModel = DatabaseModel> = T & {
   changedFields: string[];
   oldValues: DatabaseHookModelFields;
   newValues: DatabaseHookModelFields;
@@ -222,7 +219,7 @@ export type DatabaseHookModel<T extends Model = Model> = T & {
   dataValues: Record<string, unknown>;
 };
 
-export type DatabaseHookOptions<T extends Model = Model> = {
+export type DatabaseHookOptions<T extends DatabaseModel = DatabaseModel> = {
   beforeCommit?: (
     instance: DatabaseHookModel<T>,
     options: DatabaseQueryOptions<Attributes<T>> & { transaction: DatabaseTransaction },
@@ -315,21 +312,21 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     o: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
-  ) => Promise<Model<TModels[TModelName]> | null>;
+  ) => Promise<DatabaseModel<TModels[TModelName]> | null>;
   findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     where: DatabaseWhere,
     defaults: MakeNullishOptional<TModels[TModelName]>,
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<[Model<TModels[TModelName]>, boolean]>;
+  ) => Promise<[DatabaseModel<TModels[TModelName]>, boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     id: DatabaseRowID | null | undefined,
     opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
-  ) => Promise<Model<TModels[TModelName]> | null>;
+  ) => Promise<DatabaseModel<TModels[TModelName]> | null>;
 };
 
-export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
+export type DatabaseConnection<TModels extends DatabaseModels = DatabaseModels> = Sequelize & {
   fieldValue: typeof Op;
   QueryTypes?: QueryTypes;
   fn: typeof fn;
@@ -655,8 +652,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
         event,
         `${String(modelName)}${capitalize(event)}`,
         async (
-          instance: DatabaseHookModel<Model<typeof model>>,
-          queryProps: DatabaseQueryOptions<Model<typeof model>>,
+          instance: DatabaseHookModel<DatabaseModel<typeof model>>,
+          queryProps: DatabaseQueryOptions<DatabaseModel<typeof model>>,
         ): Promise<void> => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
             const w = `Constructor's name (${
@@ -743,14 +740,14 @@ export async function initDatabase<TModels extends DatabaseModels>(
       opts?: DatabaseQueryOptions,
     ) {
       const model = models[modelName];
-      const exist = await model.findOne<Model<TModels[TModelName]>>({
+      const exist = await model.findOne<DatabaseModel<TModels[TModelName]>>({
         where,
         ...opts,
       });
       if (exist) {
         return [exist, false];
       }
-      const res = await model.create<Model<TModels[TModelName]>>(defaults, opts);
+      const res = await model.create<DatabaseModel<TModels[TModelName]>>(defaults, opts);
       return [res, true];
     },
     //
