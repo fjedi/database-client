@@ -158,7 +158,7 @@ export function filterByField(
   field: string,
   values: FilterParams['values'],
   compareType: FilterParams['compareType'],
-  params: Omit<FilterParams, 'values' | 'compareType'>,
+  params?: Omit<FilterParams, 'values' | 'compareType'>,
 ): void {
   if (compareType === 'numberRange') {
     if (!values) {
