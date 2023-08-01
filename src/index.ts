@@ -194,7 +194,7 @@ type DatabaseHookModelFields = {
   [key: string]: unknown;
 };
 
-export type DatabaseHookModel<T extends Model = Model> = Model<T> & {
+export type DatabaseHookModel<T extends Model = Model> = T & {
   changedFields: string[];
   oldValues: DatabaseHookModelFields;
   newValues: DatabaseHookModelFields;
