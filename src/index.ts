@@ -21,7 +21,6 @@ import {
   or,
   json,
   IncludeOptions,
-  Attributes,
   FindOptions,
 } from 'sequelize';
 // @ts-ignore
@@ -150,7 +149,7 @@ export type DatabaseInclude = IncludeOptions;
 export type DatabaseModels = {
   [k: string]: ModelStatic<Model>;
 };
-export interface DatabaseQueryOptions<T = Model> extends FindOptions<T> {
+export interface DatabaseQueryOptions<T = ModelStatic<Model>> extends FindOptions<T> {
   // attributes?: string[]; // -> An array of attributes (e.g. ['name', 'birthday']). Default: *
   where?: WhereOptions; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
@@ -195,18 +194,19 @@ type DatabaseHookModelFields = {
   [key: string]: unknown;
 };
 
-export type DatabaseHookModel = Model & {
+export type DatabaseHookModel<T extends ModelStatic<Model> = ModelStatic<Model>> = Model<T> & {
   changedFields: string[];
   oldValues: DatabaseHookModelFields;
   newValues: DatabaseHookModelFields;
   _changed: Set<string>;
-  _previousDataValues: Attributes<Model>;
+  _previousDataValues: Record<string, unknown>;
+  dataValues: Record<string, unknown>;
   [field: string]: unknown;
 };
 
-export type DatabaseHookOptions = {
-  beforeCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
-  afterCommit?: (instance: DatabaseHookModel, options: DatabaseQueryOptions) => Promise<void>;
+export type DatabaseHookOptions<T extends ModelStatic<Model> = ModelStatic<Model>> = {
+  beforeCommit?: (instance: DatabaseHookModel<T>, options: DatabaseQueryOptions) => Promise<void>;
+  afterCommit?: (instance: DatabaseHookModel<T>, options: DatabaseQueryOptions) => Promise<void>;
 };
 
 export type DatabaseHookEvents =
@@ -623,7 +623,10 @@ export async function initDatabase<TModels extends DatabaseModels>(
       model.addHook(
         event,
         `${String(modelName)}${capitalize(event)}`,
-        async (instance: DatabaseHookModel, queryProps: DatabaseQueryOptions) => {
+        async (
+          instance: DatabaseHookModel<TModels[keyof TModels]>,
+          queryProps: DatabaseQueryOptions<TModels[keyof TModels]>,
+        ) => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
             const w = `Constructor's name (${
               instance.constructor.name
