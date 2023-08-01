@@ -624,9 +624,9 @@ export async function initDatabase<TModels extends DatabaseModels>(
         event,
         `${String(modelName)}${capitalize(event)}`,
         async (
-          instance: DatabaseHookModel<TModels[keyof TModels]>,
-          queryProps: DatabaseQueryOptions<TModels[keyof TModels]>,
-        ) => {
+          instance: DatabaseHookModel<typeof model>,
+          queryProps: DatabaseQueryOptions<typeof model>,
+        ): Promise<void> => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
             const w = `Constructor's name (${
               instance.constructor.name
