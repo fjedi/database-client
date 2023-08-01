@@ -1,25 +1,16 @@
-import {
-  WhereOptions,
-  WhereOperators,
-  Op,
-  Transaction,
-  OrOperator,
-  WhereAttributeHash,
-  WhereAttributeHashValue,
-} from 'sequelize';
+import { WhereOperators, Op, OrOperator, WhereAttributeHash } from 'sequelize';
 import snakeCase from 'lodash/snakeCase';
 import camelCase from 'lodash/camelCase';
 import upperFirst from 'lodash/upperFirst';
 import compact from 'lodash/compact';
 import { logger as rootLogger } from '@fjedi/logger';
-
 //
 export const logger = rootLogger.child({ module: 'DATABASE' });
 
 // Custom Tables' names (if we need to override filename-based naming
-const dbTables: { [k: string]: any } = {};
+const dbTables: { [k: string]: string } = {};
 // Custom Models' names (if we need to override filename-based naming
-const dbModels: { [k: string]: any } = {};
+const dbModels: { [k: string]: string } = {};
 
 //
 export function getModelName(key: string): string {
@@ -184,37 +175,4 @@ export function filterByField(
     return;
   }
   where[field] = createFilter(params);
-}
-
-// Used as an 'invisible' property on transaction objects,
-// used to stored "after*" hook functions that should only run if the transaction actually commits successfully
-const transHooks = Symbol('afterCommitHooks');
-export function afterCommitHook(transaction: Transaction, hookFn: () => unknown): void {
-  if (typeof hookFn !== 'function') return;
-  if (!transaction) {
-    hookFn();
-    return;
-  }
-
-  // @ts-ignore
-  if (!transaction[transHooks]) {
-    // @ts-ignore
-    // eslint-disable-next-line no-param-reassign
-    transaction[transHooks] = [];
-
-    const origFn = transaction.commit;
-    // eslint-disable-next-line no-param-reassign
-    transaction.commit = function commitTransaction(...args) {
-      const commitPromise = origFn.call(this, ...args);
-      // @ts-ignore
-      const runHooks = (v) => transaction[transHooks].forEach((fn) => fn()) && v;
-      //
-      return typeof (commitPromise && commitPromise.then) === 'function'
-        ? commitPromise.then(runHooks)
-        : runHooks(commitPromise);
-    };
-  }
-
-  // @ts-ignore
-  transaction[transHooks].push(hookFn);
 }

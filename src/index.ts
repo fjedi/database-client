@@ -1,19 +1,17 @@
 import { get, uniq, flatten, capitalize, pick } from 'lodash';
-import { map as mapPromise } from 'bluebird';
 import {
   Sequelize,
   Op,
   Transaction,
-  QueryOptions,
+  ProjectionAlias,
   WhereOptions,
   where as whereFn,
-  IncludeOptions,
   Dialect,
   QueryTypes,
   Options,
   DataTypes,
   Model,
-  Order,
+  ModelStatic,
   Association,
   fn,
   col,
@@ -22,18 +20,20 @@ import {
   cast,
   or,
   json,
+  IncludeOptions,
+  Attributes,
+  FindOptions,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
 import getQueryFields from 'graphql-list-fields';
-import { stringify, parse } from 'json-buffer';
-import shimmer from 'shimmer';
+import type { GraphQLResolveInfo } from 'graphql';
 import { redis, RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
 //
 import runMigrations from './migrate';
 //
-import { getModelName, getTableName, filterByField, afterCommitHook, logger } from './helpers';
+import { getModelName, getTableName, filterByField, logger } from './helpers';
 
 export type {
   Transaction,
@@ -61,6 +61,8 @@ export type {
   IncrementDecrementOptions,
   ModelAttributes,
   ModelOptions,
+  ModelStatic,
+  Attributes,
 } from 'sequelize';
 
 export {
@@ -104,10 +106,6 @@ export {
 
 export * from './helpers';
 
-// Type `ModelType` would basically wrap & satisfy the 'this' context of any sequelize helper methods
-type Constructor<T> = new (...args: any[]) => T;
-export type ModelType<T extends Model<T>> = Constructor<T> & typeof Model;
-
 export type DatabaseConnectionOptions = {
   engine?: Dialect;
   storage?: 'mysql' | 'postgres';
@@ -150,27 +148,24 @@ export type SortDirection = 'ASC' | 'DESC';
 export type DatabaseWhere = WhereOptions;
 export type DatabaseInclude = IncludeOptions;
 export type DatabaseModels = {
-  [k: string]: ModelType<Model>;
+  [k: string]: ModelStatic<Model>;
 };
-
-export interface DatabaseQueryOptions extends QueryOptions {
-  transaction?: DatabaseTransaction;
-  attributes?: string[];
-  where?: WhereOptions;
+export interface DatabaseQueryOptions<T = Model> extends FindOptions<T> {
+  // attributes?: string[]; // -> An array of attributes (e.g. ['name', 'birthday']). Default: *
+  where?: WhereOptions; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
-  raw?: boolean;
+  // order?: Array<[string, SortingDirection]>; // -> e.g. 'id DESC'
+  // group?: string; //
+  limit?: number; // -> The maximum count you want to get.
+  offset?: number; //
   paranoid?: boolean;
+  rejectOnEmpty?: boolean;
+  raw?: boolean;
   context?: unknown;
-  limit?: number;
-  offset?: number;
-  order?: Order;
+  attributes?: (string | ProjectionAlias)[];
 }
 export interface DatabaseTreeQueryOptions extends DatabaseQueryOptions {
-  cachePolicy?: 'no-cache' | 'cache-first' | 'cache-only';
-  cachePeriod?: number;
-  cacheKey?: string;
-  throwErrorIfNotFound?: boolean;
-  resolveInfo?: any;
+  resolveInfo?: GraphQLResolveInfo;
   relationKeysMap?: Map<string, string>;
 }
 
@@ -197,14 +192,16 @@ export type SortOptions = {
 /// HOOKS
 ///
 type DatabaseHookModelFields = {
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type DatabaseHookModel = Model & {
   changedFields: string[];
   oldValues: DatabaseHookModelFields;
   newValues: DatabaseHookModelFields;
-  [field: string]: any;
+  _changed: Set<string>;
+  _previousDataValues: Attributes<Model>;
+  [field: string]: unknown;
 };
 
 export type DatabaseHookOptions = {
@@ -250,15 +247,14 @@ export type DatabaseHookEvents =
 //
 export type DatabaseHelpers<TModels extends DatabaseModels> = {
   wrapInTransaction: (
-    action: (tx: DatabaseTransaction) => Promise<any>,
+    action: (tx: DatabaseTransaction) => Promise<unknown>,
     opts?: DatabaseTransactionProps,
-  ) => Promise<any>;
+  ) => Promise<unknown>;
   initModelHook: (
     modelName: keyof TModels,
     event: DatabaseHookEvents,
     options: DatabaseHookOptions,
   ) => void;
-  afterCommitHook: typeof afterCommitHook;
   getListQueryOptions(
     options: {
       pagination?: Partial<PaginationOptions>;
@@ -280,29 +276,29 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
     p: GetQueryTreeParams<TModels> & {
       query: 'findAndCountAll' | 'findAll' | 'findOne' | 'dbInstanceById';
     },
-  ) => any;
-  createDatabaseContext: (p: any) => any;
+  ) => IncludeOptions[];
+  createDatabaseContext: (p: unknown) => unknown;
   findAndCountAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o?: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions,
   ) => Promise<DatabaseListWithPagination<TModels, TModelName>>;
   findAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o?: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions,
   ) => Promise<DatabaseList<TModels, TModelName>>;
   findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o?: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions,
   ) => Promise<TModels[TModelName] | null>;
   findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     where: DatabaseWhere,
-    defaults: { [k: string]: any },
+    defaults: Record<string, unknown>,
     opts?: DatabaseTreeQueryOptions,
   ) => Promise<[TModels[TModelName], boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    id: unknown,
+    id: string | number,
     opts?: DatabaseTreeQueryOptions,
   ) => Promise<TModels[TModelName] | null>;
 };
@@ -337,63 +333,40 @@ export type DatabaseListWithPagination<
   pageInfo: { current: number; total: number; hasPreviousPage: boolean; hasNextPage: boolean };
 };
 
-export function databaseQueryLogger(query: string, params: any): void {
-  const { bind } = params;
-  return logger.info(query, { bind });
-}
-
-//
-function shimCachedInstance(instance: any) {
-  shimmer.wrap(
-    instance,
-    'update',
-    (original: any) =>
-      function shimmedInstance(updates: any, options = {}) {
-        // @ts-ignore
-        if (options.shimmed) {
-          // @ts-ignore
-          // eslint-disable-next-line prefer-rest-params
-          return original.apply(this, arguments);
-        }
-        const {
-          name: { singular: modelName },
-          sequelize: { models },
-        } = instance._modelOptions; // eslint-disable-line no-underscore-dangle
-        //
-        return models[modelName].findByPk(instance.id, options).then((reloadedInstance: any) =>
-          reloadedInstance.update(updates, {
-            ...options,
-            shimmed: true,
-          }),
-        );
-      },
-  );
-  shimmer.wrap(
-    instance,
-    'destroy',
-    (original: any) =>
-      function shimmedInstance(options = {}) {
-        // @ts-ignore
-        if (options.shimmed) {
-          // @ts-ignore
-          // eslint-disable-next-line prefer-rest-params
-          return original.apply(this, arguments);
-        }
-        const {
-          name: { singular: modelName },
-          sequelize: { models },
-        } = instance._modelOptions; // eslint-disable-line no-underscore-dangle
-        //
-        return models[modelName]
-          .findByPk(instance.id, { ...options, paranoid: false })
-          .then((reloadedInstance: any) =>
-            reloadedInstance.destroy({
-              ...options,
-              shimmed: true,
-            }),
-          );
-      },
-  );
+export function databaseQueryLogger(query: string, params: unknown): void {
+  const {
+    type,
+    bind,
+    limit,
+    offset,
+    hooks,
+    rejectOnEmpty,
+    attributes,
+    originalAttributes,
+    where,
+    order,
+    raw,
+    plain,
+  } = params as DatabaseQueryOptions & {
+    model?: Model;
+    hooks?: boolean;
+    tableNames?: string[];
+    originalAttributes?: DatabaseQueryOptions['attributes'];
+  };
+  return logger.info(query, {
+    type,
+    bind,
+    limit,
+    offset,
+    hooks,
+    rejectOnEmpty,
+    attributes,
+    originalAttributes,
+    where,
+    order,
+    raw,
+    plain,
+  });
 }
 
 function queryBuilder<TModels extends DatabaseModels>(
@@ -405,12 +378,11 @@ function queryBuilder<TModels extends DatabaseModels>(
 ) {
   const {
     context,
-    cachePeriod = 30000,
-    throwErrorIfNotFound = true,
     resolveInfo,
     relationKeysMap,
     attributes = [],
     query,
+    rejectOnEmpty,
     ...bypassParams
   } = opts || {};
   //
@@ -443,7 +415,7 @@ function queryBuilder<TModels extends DatabaseModels>(
     const foreignKeys: string[] = Object.keys(tableAttributes).filter(
       (field) => tableAttributes[field].references,
     );
-    //
+
     attributes.push(
       ...model.primaryKeyAttributes,
       ...foreignKeys,
@@ -639,8 +611,6 @@ export async function initDatabase<TModels extends DatabaseModels>(
       };
     },
     //
-    afterCommitHook,
-    //
     initModelHook(
       modelName: keyof TModels,
       event: DatabaseHookEvents,
@@ -653,7 +623,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       model.addHook(
         event,
         `${String(modelName)}${capitalize(event)}`,
-        async (instance: DatabaseHookModel, queryProps: any) => {
+        async (instance: DatabaseHookModel, queryProps: DatabaseQueryOptions) => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
             const w = `Constructor's name (${
               instance.constructor.name
@@ -667,13 +637,11 @@ export async function initDatabase<TModels extends DatabaseModels>(
           if (!event.includes('Bulk') && !event.includes('Create') && !event.includes('Destroy')) {
             //
             if (!instance.isNewRecord) {
-              //
               const {
                 _changed: changedFields,
                 _previousDataValues: prevValues,
                 dataValues,
               } = instance;
-              // const noChanges = Object.keys(changedFields).every((field) => !changedFields[field]);
               const noChanges = changedFields.size === 0;
               if (noChanges && dataValues.deletedAt === null) {
                 logger.warn('Emit db-hook event without any changes', {
@@ -700,9 +668,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
           if (typeof beforeCommit === 'function') {
             await beforeCommit(instance, queryProps);
           }
-          //
-          if (typeof afterCommit === 'function') {
-            afterCommitHook(transaction, () => afterCommit(instance, queryProps));
+          if (transaction && typeof afterCommit === 'function') {
+            await transaction.afterCommit(() => afterCommit(instance, queryProps));
           }
         },
       );
@@ -745,7 +712,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async findOrCreate<TModelName extends keyof TModels>(
       modelName: keyof TModels,
       where: DatabaseWhere,
-      defaults: Record<string, any>,
+      defaults: Record<string, unknown>,
       opts?: DatabaseQueryOptions,
     ) {
       //
@@ -781,65 +748,27 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAndCountAll<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: Omit<DatabaseTreeQueryOptions, 'throwErrorIfNotFound'>,
+      opts?: Omit<DatabaseTreeQueryOptions, 'rejectOnEmpty'>,
     ): Promise<DatabaseListWithPagination<TModels, TModelName>> {
       //
-      const {
-        cachePolicy = 'no-cache',
-        cachePeriod = 10000,
-        context,
-        resolveInfo,
-        raw,
-        relationKeysMap,
-        ...queryOptions
-      } = opts || {};
+      const { context, resolveInfo, raw, relationKeysMap, ...queryOptions } = opts || {};
       //
       const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
-      const cacheKey = `${String(modelName)}_findAndCountAll_${stringify(queryOptions)}`;
-      let cachedInstance: DatabaseListWithPagination<TModels, TModelName> | null = null;
       const pagination = pick(queryOptions, ['limit', 'offset']);
-      if (cachePolicy !== 'no-cache') {
-        try {
-          //
-          const cached = await redis.getAsync(cacheKey);
-          //
-          if (cached) {
-            const { rows, count } = parse(cached);
-            // @ts-ignore
-            cachedInstance = {
-              count,
-              rows: await mapPromise(rows, (r: any) => model.build(r)),
-            } as DatabaseListWithPagination<TModels, TModelName>;
-          } else {
-            cachedInstance = null;
-          }
-          if (cachePolicy === 'cache-only') {
-            return connection.helpers.getListWithPageInfo(
-              cachedInstance || { rows: [], count: 0 },
-              pagination,
-            );
-          }
-        } catch (err) {
-          cachedInstance = null;
-          logger.error(err as Error);
-        }
-      }
       //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findAndCountAll' });
 
-      const res = (cachedInstance ||
-        (await model.findAndCountAll(p))) as DatabaseListWithPagination<TModels, TModelName>;
+      const res = (await model.findAndCountAll(p)) as unknown as DatabaseListWithPagination<
+        TModels,
+        TModelName
+      >;
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
         // @ts-ignore
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(res.rows);
-      }
-      //
-      if (cachePolicy !== 'no-cache') {
-        redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
       }
       //
       return connection.helpers.getListWithPageInfo(res, pagination);
@@ -849,135 +778,37 @@ export async function initDatabase<TModels extends DatabaseModels>(
       modelName: keyof TModels,
       opts?: DatabaseTreeQueryOptions,
     ) {
-      //
-      const {
-        cachePolicy = 'no-cache',
-        cachePeriod = 10000,
-        throwErrorIfNotFound = true,
-        context,
-        raw,
-        resolveInfo,
-        relationKeysMap,
-        ...queryOptions
-      } = opts || {};
+      const { context, raw } = opts || {};
       //
       const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
-      const cacheKey = `${String(modelName)}_findAll_${stringify(queryOptions)}`;
-      let cachedInstance: DatabaseList<TModels, TModelName> | null = null;
-      if (cachePolicy !== 'no-cache') {
-        try {
-          //
-          const cached = await redis.getAsync(cacheKey);
-          //
-          if (cached) {
-            // @ts-ignore
-            cachedInstance = (await mapPromise(parse(cached), (r: any) =>
-              model.build(r),
-            )) as DatabaseList<TModels, TModelName>;
-          } else {
-            cachedInstance = null;
-          }
-          if (cachePolicy === 'cache-only') {
-            return cachedInstance || [];
-          }
-        } catch (err) {
-          cachedInstance = null;
-          logger.error(err as Error);
-        }
-      }
-      //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findAll' });
-      //
-      // if (cachedInstance && cachePolicy === 'cache-first') {
-      //   model
-      //     .findAll(p)
-      //     .then(res => {
-      //       redis.set(cacheKey, stringify(res), 'PX', cachePeriod);
-      //     })
-      //     .catch(logger.error);
-      // }
-      //
-      const rows = cachedInstance || (await model.findAll(p));
+      const rows = (await model.findAll(p)) as unknown as DatabaseList<TModels, TModelName>;
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
         // @ts-ignore
         dataloaderContext[EXPECTED_OPTIONS_KEY].prime(rows);
       }
-      //
-      if (cachePolicy !== 'no-cache') {
-        redis.set(cacheKey, stringify(rows), 'PX', cachePeriod);
-      }
-      //
-      return rows as DatabaseList<TModels, TModelName>;
+      return rows;
     },
     async findOne<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: DatabaseTreeQueryOptions,
+      opts: DatabaseTreeQueryOptions,
     ) {
-      const {
-        cachePeriod = 30000,
-        throwErrorIfNotFound = true,
-        context,
-        resolveInfo,
-        raw,
-      } = opts || {};
-      const cachePolicy =
-        opts?.cacheKey && redis && !resolveInfo
-          ? get(opts, 'cachePolicy', 'cache-first')
-          : 'no-cache';
+      const { context, raw } = opts || {};
       //
       const model = models[modelName];
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
-      const cacheKey = `${String(modelName)}_findOne_${opts?.cacheKey}`;
-      let cachedInstance: TModels[TModelName] | null = null;
-      if (cachePolicy !== 'no-cache') {
-        try {
-          //
-          const cached = await redis.getAsync(cacheKey);
-          // @ts-ignore
-          cachedInstance = cached ? model.build(parse(cached)) : null;
-          //
-          if (cachedInstance) {
-            shimCachedInstance(cachedInstance);
-          }
-          //
-          if (cachePolicy === 'cache-only') {
-            return cachedInstance;
-          }
-        } catch (err) {
-          cachedInstance = null;
-          logger.error(err as Error);
-        }
-      }
-      //
-      if (cachedInstance && cachePolicy === 'cache-first') {
-        //
-        // model
-        //   .findOne(queryOptions)
-        //   .then(row => {
-        //     redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
-        //   })
-        //   .catch(logger.error);
-        //
-        return cachedInstance;
-      }
-      //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findOne' });
-      // @ts-ignore
-      const row = (await model.findOne(p)) as TModels[TModelName];
+      const row = (await model.findOne(p)) as unknown as TModels[TModelName];
       if (!row) {
-        if (throwErrorIfNotFound) {
+        if (opts.rejectOnEmpty) {
           throw new DefaultError(`${model.name} couldn't be found in database`, { status: 404 });
         }
         return null;
-      }
-      //
-      if (cachePolicy !== 'no-cache') {
-        redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
       }
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
@@ -988,15 +819,14 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       return row;
     },
-    //
     async dbInstanceById<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      id: unknown,
+      id: string | number,
       opts?: DatabaseTreeQueryOptions,
     ) {
-      const { cachePeriod = 30000, throwErrorIfNotFound = true, resolveInfo, context } = opts || {};
+      const { rejectOnEmpty = true, context } = opts || {};
       if (!id) {
-        if (throwErrorIfNotFound) {
+        if (rejectOnEmpty) {
           throw new DefaultError(
             `${String(modelName)} with ID: "${id}" couldn't be found in database`,
             {
@@ -1006,63 +836,19 @@ export async function initDatabase<TModels extends DatabaseModels>(
         }
         return null;
       }
-      const cachePolicy =
-        opts?.cacheKey && redis && !resolveInfo
-          ? get(opts, 'cachePolicy', 'cache-first')
-          : 'no-cache';
-      //
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
-      //
       const model = models[modelName];
-      //
-      const cacheKey = `${String(modelName)}_findByPk_${id}`;
-      let cachedInstance: TModels[TModelName] | null = null;
-      if (cachePolicy !== 'no-cache') {
-        try {
-          //
-          const cached = await redis.getAsync(cacheKey);
-          // @ts-ignore
-          cachedInstance = cached ? model.build(parse(cached)) : null;
-          //
-          if (cachedInstance) {
-            shimCachedInstance(cachedInstance);
-          }
-          //
-          if (cachePolicy === 'cache-only') {
-            return cachedInstance;
-          }
-        } catch (err) {
-          cachedInstance = null;
-          logger.error(err as Error);
-        }
-      }
-      //
-      if (cachedInstance && cachePolicy === 'cache-first') {
-        // model
-        //   .findByPk(id, queryOptions)
-        //   .then(row => {
-        //     redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
-        //   })
-        //   .catch(logger.error);
-        //
-        return cachedInstance;
-      }
 
-      //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'dbInstanceById' });
-      // @ts-ignore
-      const row = (await model.findByPk(id, p)) as TModels[TModelName];
+
+      const row = (await model.findByPk(id, p)) as unknown as TModels[TModelName];
       if (!row) {
-        if (throwErrorIfNotFound) {
+        if (rejectOnEmpty) {
           throw new DefaultError(`${model.name} with ID: "${id}" couldn't be found in database`, {
             status: 404,
           });
         }
         return null;
-      }
-      //
-      if (cachePolicy !== 'no-cache') {
-        redis.set(cacheKey, stringify(row), 'PX', cachePeriod);
       }
       // @ts-ignore
       if (dataloaderContext && dataloaderContext[EXPECTED_OPTIONS_KEY]) {
@@ -1100,10 +886,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
       if (migrationsPath) {
         await runMigrations(connection, 'up', migrationsPath);
       }
-      //
       logger.info('Database migrations completed successfully');
 
-      //
       await connection.sync();
     }
   }
