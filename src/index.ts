@@ -204,8 +204,14 @@ export type DatabaseHookModel<T extends Model = Model> = T & {
 };
 
 export type DatabaseHookOptions<T extends Model = Model> = {
-  beforeCommit?: (instance: DatabaseHookModel<T>, options: DatabaseQueryOptions) => Promise<void>;
-  afterCommit?: (instance: DatabaseHookModel<T>, options: DatabaseQueryOptions) => Promise<void>;
+  beforeCommit?: (
+    instance: DatabaseHookModel<T>,
+    options: DatabaseQueryOptions & { transaction: DatabaseTransaction },
+  ) => Promise<void>;
+  afterCommit?: (
+    instance: DatabaseHookModel<T>,
+    options: Omit<DatabaseQueryOptions, 'transaction'>,
+  ) => Promise<void>;
 };
 
 export type DatabaseHookEvents =
@@ -673,8 +679,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
           }
 
           //
-          if (typeof beforeCommit === 'function') {
-            await beforeCommit(instance, queryProps);
+          if (transaction && typeof beforeCommit === 'function') {
+            await beforeCommit(instance, { ...queryProps, transaction });
           }
           if (transaction && typeof afterCommit === 'function') {
             await transaction.afterCommit(() => afterCommit(instance, queryProps));
