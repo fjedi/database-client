@@ -154,7 +154,7 @@ export type DatabaseModels = {
     associate: () => ModelStatic<Model>;
   };
 };
-export interface DatabaseQueryOptions<T = Model> extends FindOptions<T> {
+export interface DatabaseQueryOptions<T extends Model = Model> extends FindOptions<T> {
   where?: WhereOptions<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
@@ -629,8 +629,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
         event,
         `${String(modelName)}${capitalize(event)}`,
         async (
-          instance: DatabaseHookModel,
-          queryProps: DatabaseQueryOptions<typeof model>,
+          instance: DatabaseHookModel<Model<typeof model>>,
+          queryProps: DatabaseQueryOptions<Model<typeof model>>,
         ): Promise<void> => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
             const w = `Constructor's name (${
