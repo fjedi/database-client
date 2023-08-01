@@ -45,7 +45,11 @@ export type CompareValues =
   | number
   | number[]
   | Array<string | number>
-  | TimeRangeType;
+  | TimeRangeType
+  | undefined
+  | undefined[]
+  | null[]
+  | null;
 
 export function getCompareSymbol(
   compareType: CompareType,

@@ -35,6 +35,31 @@ import runMigrations from './migrate';
 //
 import { getModelName, getTableName, filterByField, afterCommitHook, logger } from './helpers';
 
+export type {
+  Transaction,
+  QueryOptions,
+  WhereOptions,
+  WhereAttributeHash,
+  IncludeOptions,
+  Dialect,
+  QueryTypes,
+  Options,
+  Optional,
+  Order,
+  OrderItem,
+  FindOptions,
+  FindAndCountOptions,
+  FindOrCreateOptions,
+  CreateOptions,
+  BulkCreateOptions,
+  UpdateOptions,
+  UpsertOptions,
+  DestroyOptions,
+  IncrementDecrementOptions,
+  ModelAttributes,
+  ModelOptions,
+} from 'sequelize';
+
 export {
   Sequelize,
   Op,
@@ -42,18 +67,8 @@ export {
   fn,
   literal,
   where,
-  Transaction,
-  QueryOptions,
-  WhereOptions,
-  IncludeOptions,
-  Dialect,
-  QueryTypes,
-  Options,
-  Optional,
   DataTypes,
   Model,
-  Order,
-  OrderItem,
   //
   BelongsToGetAssociationMixin,
   BelongsToSetAssociationMixin,
