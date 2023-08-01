@@ -11,7 +11,6 @@ import {
   Options,
   DataTypes,
   Model,
-  ModelStatic,
   Association,
   fn,
   col,
@@ -33,36 +32,6 @@ import { RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
 import runMigrations from './migrate';
 import { getModelName, getTableName, filterByField, logger } from './helpers';
-
-export type {
-  Transaction,
-  QueryOptions,
-  WhereOptions,
-  WhereAttributeHash,
-  WhereOperators,
-  IncludeOptions,
-  Dialect,
-  QueryTypes,
-  Options,
-  Optional,
-  Order,
-  OrderItem,
-  FindOptions,
-  OrOperator,
-  AndOperator,
-  FindAndCountOptions,
-  FindOrCreateOptions,
-  CreateOptions,
-  BulkCreateOptions,
-  UpdateOptions,
-  UpsertOptions,
-  DestroyOptions,
-  IncrementDecrementOptions,
-  ModelAttributes,
-  ModelOptions,
-  ModelStatic,
-  Attributes,
-} from 'sequelize';
 
 export {
   Sequelize,
@@ -101,6 +70,35 @@ export {
   OptimisticLockError,
   DatabaseError,
   UniqueConstraintError,
+} from 'sequelize';
+
+export type {
+  Transaction,
+  QueryOptions,
+  WhereOptions,
+  WhereAttributeHash,
+  WhereOperators,
+  IncludeOptions,
+  Dialect,
+  QueryTypes,
+  Options,
+  Optional,
+  Order,
+  OrderItem,
+  FindOptions,
+  OrOperator,
+  AndOperator,
+  FindAndCountOptions,
+  FindOrCreateOptions,
+  CreateOptions,
+  BulkCreateOptions,
+  UpdateOptions,
+  UpsertOptions,
+  DestroyOptions,
+  IncrementDecrementOptions,
+  ModelAttributes,
+  ModelOptions,
+  Attributes,
 } from 'sequelize';
 
 export * from './helpers';
@@ -143,21 +141,39 @@ export type DatabaseTransactionProps = {
   autocommit?: boolean;
 };
 
+// eslint-disable-next-line
+export type DefaultAny = any;
+
 export type SortDirection = 'ASC' | 'DESC';
-export type DatabaseWhere<T = unknown> = WhereOptions<T>;
+export type DatabaseWhere<T = DefaultAny> = WhereOptions<T>;
 export type DatabaseInclude = IncludeOptions;
 
-export type DatabaseModels = {
-  [k: string]: ModelStatic<Model> & {
-    initModel: (db: Sequelize, tableName: string) => ModelStatic<Model>;
-    associate: () => ModelStatic<Model>;
-  };
+export class DatabaseModel<
+  TModelAttributes extends NonNullable<unknown> = DefaultAny,
+  TCreationAttributes extends NonNullable<unknown> = TModelAttributes,
+> extends Model<TModelAttributes, TCreationAttributes> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  initModel(_db: Sequelize, _tableName: string): void {}
+  associate(): void {}
+}
+
+type NonConstructorKeys<T> = {
+  [P in keyof T]: T[P] extends new () => DefaultAny ? never : P;
+}[keyof T];
+type NonConstructor<T> = Pick<T, NonConstructorKeys<T>>;
+
+export type ModelStatic<M extends DatabaseModel> = NonConstructor<typeof DatabaseModel> & {
+  new (): M;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  initModel(_db: Sequelize, _tableName: string): void;
+  associate(): void;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type DefaultWhereSchema = any;
+export type DatabaseModels = {
+  [k: string]: ModelStatic<DatabaseModel>;
+};
 
-export interface DatabaseQueryOptions<T = DefaultWhereSchema> extends FindOptions<T> {
+export interface DatabaseQueryOptions<T = DefaultAny> extends FindOptions<T> {
   where?: DatabaseWhere<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
@@ -165,7 +181,7 @@ export interface DatabaseQueryOptions<T = DefaultWhereSchema> extends FindOption
   context?: unknown;
   attributes?: (string | ProjectionAlias)[];
 }
-export interface DatabaseTreeQueryOptions<T = DefaultWhereSchema> extends DatabaseQueryOptions<T> {
+export interface DatabaseTreeQueryOptions<T = DefaultAny> extends DatabaseQueryOptions<T> {
   resolveInfo?: GraphQLResolveInfo;
   relationKeysMap?: Map<string, string>;
 }
@@ -329,9 +345,10 @@ export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   redis?: RedisClient;
 };
 
-export type DatabaseList<TModels extends DatabaseModels, TModelName extends keyof TModels> = Model<
-  TModels[TModelName]
->[];
+export type DatabaseList<
+  TModels extends DatabaseModels,
+  TModelName extends keyof TModels,
+> = DatabaseModel<TModels[TModelName]>[];
 
 export type DatabaseListPageInfo = {
   current: number;
@@ -808,7 +825,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findOne' });
-      const row = (await model.findOne(p)) as Model<TModels[TModelName]>;
+      const row = (await model.findOne(p)) as DatabaseModel<TModels[TModelName]>;
       if (!row) {
         if (opts.rejectOnEmpty) {
           throw new DefaultError(`${model.name} couldn't be found in database`, { status: 404 });
@@ -846,7 +863,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
 
       const p = queryBuilder(connection, modelName, { ...opts, query: 'dbInstanceById' });
 
-      const row = (await model.findByPk(id, p)) as Model<TModels[TModelName]>;
+      const row = (await model.findByPk(id, p)) as DatabaseModel<TModels[TModelName]>;
       if (!row) {
         if (rejectOnEmpty) {
           throw new DefaultError(`${model.name} with ID: "${id}" couldn't be found in database`, {

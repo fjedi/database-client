@@ -1,6 +1,6 @@
 {
   "name": "@fjedi/database-client",
-  "version": "5.0.16",
+  "version": "5.1.0",
   "description": "Wrapper around sequelize ORM with some fancy helpers for caching and full-data-tree sql-joins",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
@@ -46,6 +46,7 @@
     "@types/lodash": "4.14.196",
     "@types/shimmer": "1.0.2",
     "dataloader-sequelize": "2.3.3",
+    "graphql": "16.7.1",
     "graphql-list-fields": "2.0.2",
     "lodash": "4.17.21",
     "sequelize": "6.32.1",
@@ -76,5 +77,8 @@
       "npm run lint:fix",
       "git add"
     ]
+  },
+  "overrides": {
+    "graphql": "$graphql"
   }
 }
