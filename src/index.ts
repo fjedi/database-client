@@ -22,6 +22,7 @@ import {
   json,
   IncludeOptions,
   FindOptions,
+  Attributes,
 } from 'sequelize';
 import { MakeNullishOptional } from 'sequelize/types/utils';
 // @ts-ignore
@@ -152,7 +153,8 @@ export type DatabaseModels = {
     associate: () => ModelStatic<Model>;
   };
 };
-export interface DatabaseQueryOptions<T extends Model = Model> extends FindOptions<T> {
+export interface DatabaseQueryOptions<T extends Attributes<Model> = Attributes<Model>>
+  extends FindOptions<T> {
   where?: WhereOptions<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
@@ -160,7 +162,8 @@ export interface DatabaseQueryOptions<T extends Model = Model> extends FindOptio
   context?: unknown;
   attributes?: (string | ProjectionAlias)[];
 }
-export interface DatabaseTreeQueryOptions<T extends Model = Model> extends DatabaseQueryOptions<T> {
+export interface DatabaseTreeQueryOptions<T extends Attributes<Model> = Attributes<Model>>
+  extends DatabaseQueryOptions<T> {
   resolveInfo?: GraphQLResolveInfo;
   relationKeysMap?: Map<string, string>;
 }
@@ -204,11 +207,11 @@ export type DatabaseHookModel<T extends Model = Model> = T & {
 export type DatabaseHookOptions<T extends Model = Model> = {
   beforeCommit?: (
     instance: DatabaseHookModel<T>,
-    options: DatabaseQueryOptions & { transaction: DatabaseTransaction },
+    options: DatabaseQueryOptions<Attributes<T>> & { transaction: DatabaseTransaction },
   ) => Promise<void>;
   afterCommit?: (
     instance: DatabaseHookModel<T>,
-    options: Omit<DatabaseQueryOptions, 'transaction'>,
+    options: Omit<DatabaseQueryOptions<Attributes<T>>, 'transaction'>,
   ) => Promise<void>;
 };
 
@@ -285,26 +288,26 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   createDatabaseContext: (p: unknown) => unknown;
   findAndCountAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions<Model<TModels[TModelName]>>,
+    o: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<DatabaseListWithPagination<TModels, TModelName>>;
   findAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions<Model<TModels[TModelName]>>,
+    o: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<DatabaseList<TModels, TModelName>>;
   findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions<Model<TModels[TModelName]>> & { rejectOnEmpty?: boolean },
+    o: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
   findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     where: DatabaseWhere,
     defaults: MakeNullishOptional<TModels[TModelName]>,
-    opts?: DatabaseTreeQueryOptions<Model<TModels[TModelName]>>,
+    opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<[Model<TModels[TModelName]>, boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     id: DatabaseRowID | null | undefined,
-    opts?: DatabaseTreeQueryOptions<Model<TModels[TModelName]>> & { rejectOnEmpty?: boolean },
+    opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
 };
 
@@ -751,7 +754,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAndCountAll<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: DatabaseTreeQueryOptions,
+      opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
     ): Promise<DatabaseListWithPagination<TModels, TModelName>> {
       //
       const { context, resolveInfo, raw, relationKeysMap, ...queryOptions } = opts || {};
@@ -776,7 +779,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAll<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: DatabaseTreeQueryOptions,
+      opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
     ) {
       const { context, raw } = opts || {};
       //
@@ -795,7 +798,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     },
     async findOne<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
+      opts: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
     ) {
       const { context, raw } = opts || {};
       //
@@ -822,7 +825,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async dbInstanceById<TModelName extends keyof TModels>(
       modelName: keyof TModels,
       id: DatabaseRowID | null | undefined,
-      opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
+      opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
     ) {
       const { rejectOnEmpty = true, context } = opts || {};
       if (!id) {
