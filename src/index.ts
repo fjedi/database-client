@@ -295,7 +295,7 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   ) => Promise<DatabaseList<TModels, TModelName>>;
   findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
   findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
@@ -306,7 +306,7 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     id: DatabaseRowID | null | undefined,
-    opts?: DatabaseTreeQueryOptions,
+    opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
 };
 
