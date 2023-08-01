@@ -144,7 +144,7 @@ export type DatabaseTransactionProps = {
 };
 
 export type SortDirection = 'ASC' | 'DESC';
-export type DatabaseWhere<T> = WhereOptions<T>;
+export type DatabaseWhere<T = unknown> = WhereOptions<T>;
 export type DatabaseInclude = IncludeOptions;
 
 export type DatabaseModels = {
