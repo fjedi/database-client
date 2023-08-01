@@ -30,7 +30,7 @@
   "keywords": [
     "fjedi"
   ],
-  "author": "Alexander Radyushin <r.alex.andr@ya.ru> (https://fjedi.com)",
+  "author": "Alexander Radyushin <a.radyushin@gmail.com> (https://fjedi.com)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/fjedi/database-client/issues"
@@ -59,17 +59,17 @@
     "@types/expect": "24.3.0",
     "@types/jest": "29.5.3",
     "@types/node": "20.4.5",
-    "@typescript-eslint/eslint-plugin": "5.62.0",
-    "@typescript-eslint/parser": "5.62.0",
+    "@typescript-eslint/eslint-plugin": "6.2.1",
+    "@typescript-eslint/parser": "6.2.1",
     "eslint": "8.46.0",
     "eslint-config-airbnb-typescript": "17.1.0",
     "eslint-config-prettier": "8.9.0",
     "eslint-plugin-import": "2.28.0",
-    "eslint-plugin-prettier": "4.2.1",
+    "eslint-plugin-prettier": "5.0.0",
     "husky": "8.0.3",
     "jest": "29.6.2",
     "lint-staged": "13.2.3",
-    "prettier": "2.8.8",
+    "prettier": "3.0.0",
     "rimraf": "5.0.1",
     "ts-jest": "29.1.1",
     "typescript": "5.1.6"
