@@ -146,19 +146,14 @@ export type DatabaseTransactionProps = {
 export type SortDirection = 'ASC' | 'DESC';
 export type DatabaseWhere = WhereOptions;
 export type DatabaseInclude = IncludeOptions;
+
 export type DatabaseModels = {
   [k: string]: ModelStatic<Model>;
 };
 export interface DatabaseQueryOptions<T = ModelStatic<Model>> extends FindOptions<T> {
-  // attributes?: string[]; // -> An array of attributes (e.g. ['name', 'birthday']). Default: *
-  where?: WhereOptions; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
+  where?: WhereOptions<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
-  // order?: Array<[string, SortingDirection]>; // -> e.g. 'id DESC'
-  // group?: string; //
-  limit?: number; // -> The maximum count you want to get.
-  offset?: number; //
   paranoid?: boolean;
-  rejectOnEmpty?: boolean;
   raw?: boolean;
   context?: unknown;
   attributes?: (string | ProjectionAlias)[];
@@ -194,7 +189,7 @@ type DatabaseHookModelFields = {
   [key: string]: unknown;
 };
 
-export type DatabaseHookModel<T extends ModelStatic<Model> = ModelStatic<Model>> = Model<T> & {
+export type DatabaseHookModel<T extends Model = Model> = Model<T> & {
   changedFields: string[];
   oldValues: DatabaseHookModelFields;
   newValues: DatabaseHookModelFields;
@@ -204,7 +199,7 @@ export type DatabaseHookModel<T extends ModelStatic<Model> = ModelStatic<Model>>
   [field: string]: unknown;
 };
 
-export type DatabaseHookOptions<T extends ModelStatic<Model> = ModelStatic<Model>> = {
+export type DatabaseHookOptions<T extends Model = Model> = {
   beforeCommit?: (instance: DatabaseHookModel<T>, options: DatabaseQueryOptions) => Promise<void>;
   afterCommit?: (instance: DatabaseHookModel<T>, options: DatabaseQueryOptions) => Promise<void>;
 };
@@ -330,7 +325,7 @@ export type DatabaseListWithPagination<
 > = {
   rows: DatabaseList<TModels, TModelName>;
   count: number;
-  pageInfo: { current: number; total: number; hasPreviousPage: boolean; hasNextPage: boolean };
+  pageInfo?: { current: number; total: number; hasPreviousPage: boolean; hasNextPage: boolean };
 };
 
 export function databaseQueryLogger(query: string, params: unknown): void {
@@ -351,6 +346,7 @@ export function databaseQueryLogger(query: string, params: unknown): void {
     model?: Model;
     hooks?: boolean;
     tableNames?: string[];
+    rejectOnEmpty?: boolean;
     originalAttributes?: DatabaseQueryOptions['attributes'];
   };
   return logger.info(query, {
@@ -382,7 +378,6 @@ function queryBuilder<TModels extends DatabaseModels>(
     relationKeysMap,
     attributes = [],
     query,
-    rejectOnEmpty,
     ...bypassParams
   } = opts || {};
   //
@@ -624,7 +619,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         event,
         `${String(modelName)}${capitalize(event)}`,
         async (
-          instance: DatabaseHookModel<typeof model>,
+          instance: DatabaseHookModel,
           queryProps: DatabaseQueryOptions<typeof model>,
         ): Promise<void> => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
@@ -751,7 +746,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAndCountAll<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts?: Omit<DatabaseTreeQueryOptions, 'rejectOnEmpty'>,
+      opts?: DatabaseTreeQueryOptions,
     ): Promise<DatabaseListWithPagination<TModels, TModelName>> {
       //
       const { context, resolveInfo, raw, relationKeysMap, ...queryOptions } = opts || {};
@@ -798,7 +793,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     },
     async findOne<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      opts: DatabaseTreeQueryOptions,
+      opts: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
     ) {
       const { context, raw } = opts || {};
       //
@@ -825,7 +820,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async dbInstanceById<TModelName extends keyof TModels>(
       modelName: keyof TModels,
       id: string | number,
-      opts?: DatabaseTreeQueryOptions,
+      opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
     ) {
       const { rejectOnEmpty = true, context } = opts || {};
       if (!id) {
