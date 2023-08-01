@@ -33,6 +33,7 @@ import { DefaultError } from '@fjedi/errors';
 import runMigrations from './migrate';
 //
 import { getModelName, getTableName, filterByField, logger } from './helpers';
+import { MakeNullishOptional } from 'sequelize/types/utils';
 
 export type {
   Transaction,
@@ -148,9 +149,12 @@ export type DatabaseWhere = WhereOptions;
 export type DatabaseInclude = IncludeOptions;
 
 export type DatabaseModels = {
-  [k: string]: ModelStatic<Model>;
+  [k: string]: ModelStatic<Model> & {
+    initModel: (db: Sequelize, tableName: string) => ModelStatic<Model>;
+    associate: () => ModelStatic<Model>;
+  };
 };
-export interface DatabaseQueryOptions<T = ModelStatic<Model>> extends FindOptions<T> {
+export interface DatabaseQueryOptions<T = Model> extends FindOptions<T> {
   where?: WhereOptions<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
@@ -177,6 +181,7 @@ export type ListQueryOptions = {
 };
 
 export type PaginationOptions = Pick<ListQueryOptions, 'limit' | 'offset'>;
+
 export type SortOptions = {
   direction: SortDirection;
   fields: string[];
@@ -196,7 +201,6 @@ export type DatabaseHookModel<T extends Model = Model> = Model<T> & {
   _changed: Set<string>;
   _previousDataValues: Record<string, unknown>;
   dataValues: Record<string, unknown>;
-  [field: string]: unknown;
 };
 
 export type DatabaseHookOptions<T extends Model = Model> = {
@@ -239,6 +243,8 @@ export type DatabaseHookEvents =
   | 'beforeDisconnect'
   | 'afterDisconnect';
 
+export type DatabaseRowID = string | number;
+
 //
 export type DatabaseHelpers<TModels extends DatabaseModels> = {
   wrapInTransaction: (
@@ -261,7 +267,7 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
     },
   ): ListQueryOptions;
   getListWithPageInfo<TModelName extends keyof TModels>(
-    list: Omit<DatabaseListWithPagination<TModels, TModelName>, 'pageInfo'> | null,
+    list: DatabaseListWithCounter<TModels, TModelName> | null,
     pagination: Pick<Partial<ListQueryOptions>, 'limit' | 'offset'>,
   ): DatabaseListWithPagination<TModels, TModelName>;
   getModelName: typeof getModelName;
@@ -284,18 +290,18 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     o: DatabaseTreeQueryOptions,
-  ) => Promise<TModels[TModelName] | null>;
+  ) => Promise<Model<TModels[TModelName]> | null>;
   findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     where: DatabaseWhere,
-    defaults: Record<string, unknown>,
+    defaults: MakeNullishOptional<TModels[TModelName]>,
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<[TModels[TModelName], boolean]>;
+  ) => Promise<[Model<TModels[TModelName]>, boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    id: string | number,
+    id: DatabaseRowID | null | undefined,
     opts?: DatabaseTreeQueryOptions,
-  ) => Promise<TModels[TModelName] | null>;
+  ) => Promise<Model<TModels[TModelName]> | null>;
 };
 
 export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
@@ -314,18 +320,29 @@ export type DatabaseConnection<TModels extends DatabaseModels> = Sequelize & {
   redis: RedisClient;
 };
 
-export type DatabaseList<
-  TModels extends DatabaseModels,
-  TModelName extends keyof TModels,
-> = TModels[TModelName][];
+export type DatabaseList<TModels extends DatabaseModels, TModelName extends keyof TModels> = Model<
+  TModels[TModelName]
+>[];
 
-export type DatabaseListWithPagination<
+export type DatabaseListPageInfo = {
+  current: number;
+  total: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+};
+
+export type DatabaseListWithCounter<
   TModels extends DatabaseModels,
   TModelName extends keyof TModels,
 > = {
   rows: DatabaseList<TModels, TModelName>;
   count: number;
-  pageInfo?: { current: number; total: number; hasPreviousPage: boolean; hasNextPage: boolean };
+};
+export type DatabaseListWithPagination<
+  TModels extends DatabaseModels,
+  TModelName extends keyof TModels,
+> = DatabaseListWithCounter<TModels, TModelName> & {
+  pageInfo: DatabaseListPageInfo;
 };
 
 export function databaseQueryLogger(query: string, params: unknown): void {
@@ -487,7 +504,6 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
 
   // Creating database connection
   const dbOptions: Options = {
-    // @ts-ignore
     dialect: engine,
     host,
     port: parseInt(`${port}`, 10),
@@ -512,7 +528,7 @@ export function createConnection(options: DatabaseConnectionOptions): Sequelize 
   // @ts-ignore
   connection.fieldValue = Op;
 
-  return connection as Sequelize;
+  return connection;
 }
 
 export async function initDatabase<TModels extends DatabaseModels>(
@@ -528,17 +544,11 @@ export async function initDatabase<TModels extends DatabaseModels>(
   }
   //
   Object.keys(models).forEach((modelName: string) => {
-    // @ts-ignore
-    if (models[modelName].initModel) {
-      // @ts-ignore
-      models[modelName].initModel(connection, getTableName(modelName, tableNamePrefix));
-    }
+    models[modelName].initModel(c, getTableName(modelName, tableNamePrefix));
   });
   Object.keys(models).forEach((modelName: string) => {
-    // @ts-ignore
-    if (models[modelName].associate) {
-      // @ts-ignore
-      models[modelName].associate(models);
+    if (typeof models[modelName].associate === 'function') {
+      models[modelName].associate();
     }
   });
 
@@ -710,27 +720,25 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async findOrCreate<TModelName extends keyof TModels>(
       modelName: keyof TModels,
       where: DatabaseWhere,
-      defaults: Record<string, unknown>,
+      defaults: MakeNullishOptional<TModels[TModelName]>,
       opts?: DatabaseQueryOptions,
     ) {
-      //
       const model = models[modelName];
-      const exist = (await model.findOne({
+      const exist = await model.findOne<Model<TModels[TModelName]>>({
         where,
         ...opts,
-      })) as TModels[TModelName] | null;
+      });
       if (exist) {
         return [exist, false];
       }
-      // @ts-ignore
-      const res = (await model.create(defaults, opts)) as TModels[TModelName];
+      const res = await model.create<Model<TModels[TModelName]>>(defaults, opts);
       return [res, true];
     },
     //
     getListWithPageInfo<TModelName extends keyof TModels>(
-      list: Omit<DatabaseListWithPagination<TModels, TModelName>, 'pageInfo'> | null,
+      list: DatabaseListWithPagination<TModels, TModelName> | null,
       pagination?: Pick<Partial<ListQueryOptions>, 'limit' | 'offset'>,
-    ): DatabaseListWithPagination<TModels, TModelName> {
+    ): DatabaseListWithPagination<TModels, TModelName> & { pageInfo: DatabaseListPageInfo } {
       const { rows, count } = list ?? { rows: [], count: 0 };
       const { limit, offset } = connection.helpers.getListQueryOptions({ pagination });
       const currentPage = offset / limit + 1;
@@ -758,10 +766,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findAndCountAll' });
 
-      const res = (await model.findAndCountAll(p)) as unknown as DatabaseListWithPagination<
-        TModels,
-        TModelName
-      >;
+      const res = (await model.findAndCountAll(p)) as DatabaseListWithCounter<TModels, TModelName>;
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
@@ -782,7 +787,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findAll' });
-      const rows = (await model.findAll(p)) as unknown as DatabaseList<TModels, TModelName>;
+      const rows = (await model.findAll(p)) as DatabaseList<TModels, TModelName>;
       //
       const limitedFields = Array.isArray(p.attributes) && p.attributes.length > 0;
       if (!raw && !limitedFields && dataloaderContext) {
@@ -801,7 +806,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       const dataloaderContext = get(context, 'state.dataloaderContext', {});
       //
       const p = queryBuilder(connection, modelName, { ...opts, query: 'findOne' });
-      const row = (await model.findOne(p)) as unknown as TModels[TModelName];
+      const row = (await model.findOne(p)) as Model<TModels[TModelName]>;
       if (!row) {
         if (opts.rejectOnEmpty) {
           throw new DefaultError(`${model.name} couldn't be found in database`, { status: 404 });
@@ -819,7 +824,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     },
     async dbInstanceById<TModelName extends keyof TModels>(
       modelName: keyof TModels,
-      id: string | number,
+      id: DatabaseRowID | null | undefined,
       opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
     ) {
       const { rejectOnEmpty = true, context } = opts || {};
@@ -839,7 +844,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
 
       const p = queryBuilder(connection, modelName, { ...opts, query: 'dbInstanceById' });
 
-      const row = (await model.findByPk(id, p)) as unknown as TModels[TModelName];
+      const row = (await model.findByPk(id, p)) as Model<TModels[TModelName]>;
       if (!row) {
         if (rejectOnEmpty) {
           throw new DefaultError(`${model.name} with ID: "${id}" couldn't be found in database`, {
