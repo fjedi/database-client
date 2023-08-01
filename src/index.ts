@@ -144,7 +144,7 @@ export type DatabaseTransactionProps = {
 };
 
 export type SortDirection = 'ASC' | 'DESC';
-export type DatabaseWhere = WhereOptions;
+export type DatabaseWhere<T> = WhereOptions<T>;
 export type DatabaseInclude = IncludeOptions;
 
 export type DatabaseModels = {
@@ -155,7 +155,7 @@ export type DatabaseModels = {
 };
 export interface DatabaseQueryOptions<T extends Attributes<Model> = Attributes<Model>>
   extends FindOptions<T> {
-  where?: WhereOptions<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
+  where?: DatabaseWhere<T>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
   raw?: boolean;
