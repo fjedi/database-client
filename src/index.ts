@@ -160,7 +160,7 @@ export interface DatabaseQueryOptions<T extends Model = Model> extends FindOptio
   context?: unknown;
   attributes?: (string | ProjectionAlias)[];
 }
-export interface DatabaseTreeQueryOptions extends DatabaseQueryOptions {
+export interface DatabaseTreeQueryOptions<T extends Model = Model> extends DatabaseQueryOptions<T> {
   resolveInfo?: GraphQLResolveInfo;
   relationKeysMap?: Map<string, string>;
 }
@@ -285,26 +285,26 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   createDatabaseContext: (p: unknown) => unknown;
   findAndCountAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions<Model<TModels[TModelName]>>,
   ) => Promise<DatabaseListWithPagination<TModels, TModelName>>;
   findAll: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions<Model<TModels[TModelName]>>,
   ) => Promise<DatabaseList<TModels, TModelName>>;
   findOne: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
-    o: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
+    o: DatabaseTreeQueryOptions<Model<TModels[TModelName]>> & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
   findOrCreate: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     where: DatabaseWhere,
     defaults: MakeNullishOptional<TModels[TModelName]>,
-    opts?: DatabaseTreeQueryOptions,
+    opts?: DatabaseTreeQueryOptions<Model<TModels[TModelName]>>,
   ) => Promise<[Model<TModels[TModelName]>, boolean]>;
   dbInstanceById: <TModelName extends keyof TModels>(
     modelName: keyof TModels,
     id: DatabaseRowID | null | undefined,
-    opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
+    opts?: DatabaseTreeQueryOptions<Model<TModels[TModelName]>> & { rejectOnEmpty?: boolean },
   ) => Promise<Model<TModels[TModelName]> | null>;
 };
 
