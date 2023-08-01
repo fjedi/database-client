@@ -148,26 +148,39 @@ export type SortDirection = 'ASC' | 'DESC';
 export type DatabaseWhere<T = DefaultAny> = WhereOptions<T>;
 export type DatabaseInclude = IncludeOptions;
 
-export class DatabaseModel<
+export declare abstract class DatabaseModel<
   TModelAttributes extends NonNullable<unknown> = DefaultAny,
   TCreationAttributes extends NonNullable<unknown> = TModelAttributes,
 > extends Model<TModelAttributes, TCreationAttributes> {
+  id?: number | string;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  deletedAt?: Date | null;
+  version?: number | null;
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  static initModel(_db: Sequelize, _tableName: string): void {}
-  static associate(): void {}
+  abstract initModel(_db: Sequelize, _tableName: string): void;
+  abstract associate(): void;
 }
 
-type NonConstructorKeys<T> = {
-  [P in keyof T]: T[P] extends new () => DefaultAny ? never : P;
-}[keyof T];
-type NonConstructor<T> = Pick<T, NonConstructorKeys<T>>;
+export declare type NonAbstract<T> = {
+  [P in keyof T]: T[P];
+};
 
-export type ModelStatic<M extends DatabaseModel> = NonConstructor<typeof DatabaseModel> & {
+export declare type Repository<M> = (new () => M) &
+  NonAbstract<typeof DatabaseModel> & {
+    initModel(_db: Sequelize, _tableName: string): void;
+    associate(): void;
+  };
+
+export declare type ModelCtor<M extends DatabaseModel = DatabaseModel> = Repository<M>;
+
+export type ModelStatic<M extends DatabaseModel = DatabaseModel> = M & {
   new (): M;
 };
 
 export type DatabaseModels = {
-  [k: string]: ModelStatic<DatabaseModel>;
+  [k: string]: Repository<DatabaseModel>;
 };
 
 export interface DatabaseQueryOptions<T = DefaultAny> extends FindOptions<T> {
