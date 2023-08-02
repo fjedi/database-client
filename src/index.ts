@@ -171,7 +171,7 @@ export class DatabaseModel<
   declare createdAt: NonAttribute<Date>;
   declare updatedAt: NonAttribute<Date>;
   declare deletedAt?: NonAttribute<Date>;
-  declare version?: CreationOptional<number>;
+  declare version?: NonAttribute<number>;
 
   initModel(db: Sequelize, tableName: string) {
     return DatabaseModel.init(
