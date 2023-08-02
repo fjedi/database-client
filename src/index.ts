@@ -353,27 +353,27 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   ) => IncludeOptions[];
   createDatabaseContext: (p: unknown) => unknown;
   findAndCountAll: <TModelName extends StringKeyOf<TModels>>(
-    modelName: StringKeyOf<TModels>,
+    modelName: TModelName,
     o: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<DatabaseListWithPagination<TModels, TModelName>>;
   findAll: <TModelName extends StringKeyOf<TModels>>(
-    modelName: StringKeyOf<TModels>,
+    modelName: TModelName,
     o: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<DatabaseList<TModels, TModelName>>;
   findOne: <TModelName extends StringKeyOf<TModels>>(
-    modelName: StringKeyOf<TModels>,
+    modelName: TModelName,
     o: DatabaseTreeQueryOptions<TModels[TModelName]> & {
       rejectOnEmpty?: boolean;
     },
   ) => Promise<InstanceType<TModels[TModelName]> | null>;
   findOrCreate: <TModelName extends StringKeyOf<TModels>>(
-    modelName: StringKeyOf<TModels>,
+    modelName: TModelName,
     where: DatabaseWhere,
     defaults: NonNullable<DefaultAny>,
     opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<[InstanceType<TModels[TModelName]>, boolean]>;
   dbInstanceById: <TModelName extends StringKeyOf<TModels>>(
-    modelName: StringKeyOf<TModels>,
+    modelName: TModelName,
     id: DatabaseRowID | null | undefined,
     opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
   ) => Promise<InstanceType<TModels[TModelName]> | null>;
