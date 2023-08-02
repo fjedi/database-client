@@ -25,6 +25,7 @@ import {
   InferCreationAttributes,
   CreationOptional,
   ModelStatic,
+  ModelAttributes,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
@@ -108,6 +109,7 @@ export type {
   NonAttribute,
   InitOptions,
   BuildOptions,
+  SetOptions,
 } from 'sequelize';
 
 export * from './helpers';
@@ -154,7 +156,9 @@ export type DatabaseTransactionProps = {
 export type DefaultAny = any;
 
 export type SortDirection = 'ASC' | 'DESC';
-export type DatabaseWhere<T = DefaultAny> = WhereOptions<T>;
+export type DatabaseWhere<T extends DatabaseModel = DatabaseModel> = WhereOptions<
+  ModelAttributes<T>
+>;
 export type DatabaseInclude = IncludeOptions;
 
 export interface DatabaseModelDefaultAttributes {}
@@ -217,7 +221,7 @@ export type Attributes<M extends DatabaseModel> = M['_attributes'];
 
 export interface DatabaseQueryOptions<T extends ModelCtor = ModelCtor>
   extends FindOptions<Attributes<InstanceType<T>>> {
-  where?: DatabaseWhere<Attributes<InstanceType<T>>>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
+  where?: DatabaseWhere<InstanceType<T>>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
   raw?: boolean;
@@ -784,8 +788,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
         throw error;
       }
     },
-    async findOrCreate<TModelName extends StringKeyOf<TModels>>(
-      modelName: StringKeyOf<TModels>,
+    async findOrCreate<TModelName extends StringKeyOf<TModels> = StringKeyOf<TModels>>(
+      modelName: TModelName,
       where: DatabaseWhere,
       defaults: NonNullable<DefaultAny>,
       opts?: DatabaseTreeQueryOptions,
@@ -819,8 +823,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
       };
     },
     //
-    async findAndCountAll<TModelName extends StringKeyOf<TModels>>(
-      modelName: StringKeyOf<TModels>,
+    async findAndCountAll<TModelName extends StringKeyOf<TModels> = StringKeyOf<TModels>>(
+      modelName: TModelName,
       opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
     ): Promise<DatabaseListWithPagination<TModels, TModelName>> {
       //
@@ -844,8 +848,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
       return connection.helpers.getListWithPageInfo(res, pagination);
     },
     //
-    async findAll<TModelName extends StringKeyOf<TModels>>(
-      modelName: StringKeyOf<TModels>,
+    async findAll<TModelName extends StringKeyOf<TModels> = StringKeyOf<TModels>>(
+      modelName: TModelName,
       opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
     ) {
       const { context, raw } = opts || {};
@@ -863,7 +867,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
       }
       return rows;
     },
-    async findOne<TModelName extends StringKeyOf<TModels>>(
+    async findOne<TModelName extends StringKeyOf<TModels> = StringKeyOf<TModels>>(
       modelName: TModelName,
       opts: DatabaseTreeQueryOptions<TModels[TModelName]> & {
         rejectOnEmpty?: boolean;
@@ -891,8 +895,8 @@ export async function initDatabase<TModels extends DatabaseModels>(
       //
       return row;
     },
-    async dbInstanceById<TModelName extends StringKeyOf<TModels>>(
-      modelName: StringKeyOf<TModels>,
+    async dbInstanceById<TModelName extends StringKeyOf<TModels> = StringKeyOf<TModels>>(
+      modelName: TModelName,
       id: DatabaseRowID | null | undefined,
       opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
     ) {
