@@ -215,16 +215,16 @@ export type DatabaseModels = {
 
 export type Attributes<M extends DatabaseModel> = M['_attributes'];
 
-export interface DatabaseQueryOptions<T extends DatabaseModel = DatabaseModel>
-  extends FindOptions<T> {
-  where?: DatabaseWhere<Attributes<T>>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
+export interface DatabaseQueryOptions<T extends ModelCtor = ModelCtor>
+  extends FindOptions<Attributes<InstanceType<T>>> {
+  where?: DatabaseWhere<Attributes<InstanceType<T>>>; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
   include?: IncludeOptions[];
   paranoid?: boolean;
   raw?: boolean;
   context?: unknown;
   attributes?: (string | ProjectionAlias)[];
 }
-export interface DatabaseTreeQueryOptions<T extends DatabaseModel = DatabaseModel>
+export interface DatabaseTreeQueryOptions<T extends ModelCtor = ModelCtor>
   extends DatabaseQueryOptions<T> {
   resolveInfo?: GraphQLResolveInfo;
   relationKeysMap?: Map<string, string>;
@@ -269,11 +269,11 @@ export type DatabaseHookModel<T extends DatabaseModel> = T & {
 export type DatabaseHookOptions<T extends DatabaseModel> = {
   beforeCommit?: (
     instance: DatabaseHookModel<T>,
-    options: DatabaseQueryOptions<T> & { transaction: DatabaseTransaction },
+    options: DatabaseQueryOptions<ModelCtor<T>> & { transaction: DatabaseTransaction },
   ) => Promise<void>;
   afterCommit?: (
     instance: DatabaseHookModel<T>,
-    options: Omit<DatabaseQueryOptions<T>, 'transaction'>,
+    options: Omit<DatabaseQueryOptions<ModelCtor<T>>, 'transaction'>,
   ) => Promise<void>;
 };
 
@@ -350,15 +350,15 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
   createDatabaseContext: (p: unknown) => unknown;
   findAndCountAll: <TModelName extends StringKeyOf<TModels>>(
     modelName: StringKeyOf<TModels>,
-    o: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<DatabaseListWithPagination<TModels, TModelName>>;
   findAll: <TModelName extends StringKeyOf<TModels>>(
     modelName: StringKeyOf<TModels>,
-    o: DatabaseTreeQueryOptions,
+    o: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<DatabaseList<TModels, TModelName>>;
   findOne: <TModelName extends StringKeyOf<TModels>>(
     modelName: StringKeyOf<TModels>,
-    o: DatabaseTreeQueryOptions<InstanceType<TModels[TModelName]>> & {
+    o: DatabaseTreeQueryOptions<TModels[TModelName]> & {
       rejectOnEmpty?: boolean;
     },
   ) => Promise<InstanceType<TModels[TModelName]> | null>;
@@ -366,12 +366,12 @@ export type DatabaseHelpers<TModels extends DatabaseModels> = {
     modelName: StringKeyOf<TModels>,
     where: DatabaseWhere,
     defaults: NonNullable<DefaultAny>,
-    opts?: DatabaseTreeQueryOptions,
+    opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
   ) => Promise<[InstanceType<TModels[TModelName]>, boolean]>;
   dbInstanceById: <TModelName extends StringKeyOf<TModels>>(
     modelName: StringKeyOf<TModels>,
     id: DatabaseRowID | null | undefined,
-    opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
+    opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
   ) => Promise<InstanceType<TModels[TModelName]> | null>;
 };
 
@@ -704,7 +704,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
         `${String(modelName)}${capitalize(event)}`,
         async (
           instance: DatabaseHookModel<InstanceType<TModels[T]>>,
-          queryProps: DatabaseQueryOptions<InstanceType<TModels[T]>>,
+          queryProps: DatabaseQueryOptions,
         ): Promise<void> => {
           if (typeof afterCommit === 'function' && instance.constructor.name !== modelName) {
             const w = `Constructor's name (${
@@ -821,7 +821,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAndCountAll<TModelName extends StringKeyOf<TModels>>(
       modelName: StringKeyOf<TModels>,
-      opts?: DatabaseTreeQueryOptions,
+      opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
     ): Promise<DatabaseListWithPagination<TModels, TModelName>> {
       //
       const { context, resolveInfo, raw, relationKeysMap, ...queryOptions } = opts || {};
@@ -846,7 +846,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     //
     async findAll<TModelName extends StringKeyOf<TModels>>(
       modelName: StringKeyOf<TModels>,
-      opts?: DatabaseTreeQueryOptions,
+      opts?: DatabaseTreeQueryOptions<TModels[TModelName]>,
     ) {
       const { context, raw } = opts || {};
       //
@@ -865,7 +865,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     },
     async findOne<TModelName extends StringKeyOf<TModels>>(
       modelName: TModelName,
-      opts: DatabaseTreeQueryOptions<InstanceType<TModels[TModelName]>> & {
+      opts: DatabaseTreeQueryOptions<TModels[TModelName]> & {
         rejectOnEmpty?: boolean;
       },
     ) {
@@ -894,7 +894,7 @@ export async function initDatabase<TModels extends DatabaseModels>(
     async dbInstanceById<TModelName extends StringKeyOf<TModels>>(
       modelName: StringKeyOf<TModels>,
       id: DatabaseRowID | null | undefined,
-      opts?: DatabaseTreeQueryOptions & { rejectOnEmpty?: boolean },
+      opts?: DatabaseTreeQueryOptions<TModels[TModelName]> & { rejectOnEmpty?: boolean },
     ) {
       const { rejectOnEmpty = true, context } = opts || {};
       if (!id) {
