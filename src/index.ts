@@ -168,7 +168,6 @@ export class DatabaseModel extends Model<
   declare deletedAt?: CreationOptional<Date>;
   declare version?: CreationOptional<number>;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   initModel(db: Sequelize, tableName: string) {
     return DatabaseModel.init(
       {
