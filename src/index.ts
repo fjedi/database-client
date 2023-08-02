@@ -158,9 +158,9 @@ export type DatabaseWhere<T = DefaultAny> = WhereOptions<T>;
 export type DatabaseInclude = IncludeOptions;
 
 export interface DatabaseModelDefaultAttributes {}
-export class DatabaseModel<TModel extends Model = Model> extends Model<
-  InferAttributes<TModel>,
-  InferCreationAttributes<TModel>
+export class DatabaseModel extends Model<
+  InferAttributes<DatabaseModel>,
+  InferCreationAttributes<DatabaseModel>
 > {
   declare id: CreationOptional<string>;
   declare createdAt: CreationOptional<Date>;
