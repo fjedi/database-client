@@ -26,6 +26,7 @@ import {
   CreationOptional,
   ModelStatic,
   ModelAttributes,
+  NonAttribute,
 } from 'sequelize';
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
@@ -162,14 +163,14 @@ export type DatabaseWhere<T extends DatabaseModel = DatabaseModel> = WhereOption
 export type DatabaseInclude = IncludeOptions;
 
 export interface DatabaseModelDefaultAttributes {}
-export class DatabaseModel extends Model<
-  InferAttributes<DatabaseModel>,
-  InferCreationAttributes<DatabaseModel>
-> {
+export class DatabaseModel<
+  IA extends DatabaseModel<DefaultAny> = DatabaseModel<DefaultAny>,
+  ICA extends DatabaseModel<DefaultAny> = IA,
+> extends Model<InferAttributes<IA>, InferCreationAttributes<ICA>> {
   declare id: CreationOptional<string>;
-  declare createdAt: CreationOptional<Date>;
-  declare updatedAt: CreationOptional<Date>;
-  declare deletedAt?: CreationOptional<Date>;
+  declare createdAt: NonAttribute<Date>;
+  declare updatedAt: NonAttribute<Date>;
+  declare deletedAt?: NonAttribute<Date>;
   declare version?: CreationOptional<number>;
 
   initModel(db: Sequelize, tableName: string) {
@@ -182,8 +183,6 @@ export class DatabaseModel extends Model<
           primaryKey: true,
           unique: true,
         },
-        createdAt: DataTypes.DATE,
-        updatedAt: DataTypes.DATE,
       },
       {
         sequelize: db,
