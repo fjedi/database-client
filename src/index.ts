@@ -166,7 +166,7 @@ export type DatabaseInclude = IncludeOptions;
 export interface DatabaseModelDefaultAttributes {}
 export class DatabaseModel<
   IA extends DatabaseModel<DefaultAny> = DatabaseModel<DefaultAny>,
-  ICA extends DatabaseModel<DefaultAny> = IA,
+  ICA extends DatabaseModel<ICA> = IA,
 > extends Model<InferAttributes<IA>, InferCreationAttributes<ICA>> {
   declare id: CreationOptional<string>;
   declare createdAt: NonAttribute<Date>;
