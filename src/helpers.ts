@@ -148,25 +148,27 @@ export function filterByField(
   compareType: FilterParams['compareType'],
   params?: Omit<FilterParams, 'values' | 'compareType'>,
 ): void {
+  let filter: WhereOperators | OrOperator;
   if (compareType === 'numberRange') {
     if (!values) {
       return;
     }
     const { min, max } = values as NumberRangeType;
-    where[field] = createRangeFilter({ min, max });
-    return;
-  }
-  if (compareType === 'timeRange') {
+    filter = createRangeFilter({ min, max });
+  } else if (compareType === 'timeRange') {
     if (!values) {
       return;
     }
     const { from, to } = values as TimeRangeType;
-    where[field] = createRangeFilter({ min: from, max: to });
-    return;
+    filter = createRangeFilter({ min: from, max: to });
+  } else {
+    filter = createFilter({
+      ...params,
+      values,
+      compareType,
+    });
   }
-  where[field] = createFilter({
-    ...params,
-    values,
-    compareType,
-  });
+  if (filter && Object.keys(filter).length) {
+    where[field] = filter;
+  }
 }
