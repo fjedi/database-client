@@ -31,7 +31,6 @@ import {
 // @ts-ignore
 import { createContext, EXPECTED_OPTIONS_KEY } from 'dataloader-sequelize';
 import getQueryFields from 'graphql-list-fields';
-import type { GraphQLResolveInfo } from 'graphql';
 import { RedisClient } from '@fjedi/redis-client';
 import { DefaultError } from '@fjedi/errors';
 import runMigrations from './migrate';
@@ -230,7 +229,9 @@ export interface DatabaseQueryOptions<T extends ModelCtor = ModelCtor>
 }
 export interface DatabaseTreeQueryOptions<T extends ModelCtor = ModelCtor>
   extends DatabaseQueryOptions<T> {
-  resolveInfo?: GraphQLResolveInfo;
+  // We don't use GraphQLResolveInfo here, because graphql module from graphql-list-fields doesn't export it
+  // and we can't use our own version of graphql module due to ts-type conflicts between them
+  resolveInfo?: DefaultAny;
   relationKeysMap?: Map<string, string>;
 }
 
