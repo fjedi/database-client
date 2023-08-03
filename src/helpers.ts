@@ -1,4 +1,4 @@
-import { WhereOperators, Op, OrOperator, WhereAttributeHash } from 'sequelize';
+import { WhereOperators, Op, WhereAttributeHash } from 'sequelize';
 import snakeCase from 'lodash/snakeCase';
 import camelCase from 'lodash/camelCase';
 import upperFirst from 'lodash/upperFirst';
@@ -76,7 +76,7 @@ export function getCompareSymbol(
   return Op[symbol];
 }
 
-export function createFilter(params: FilterParams): WhereOperators | OrOperator {
+export function createFilter(params: FilterParams): WhereOperators {
   const { values, compareType } = params;
   if (compareType === 'timeRange' || compareType === 'numberRange') {
     throw new Error(`To filter by date- or number range, use "createRangeFilter" helper`);
@@ -148,7 +148,7 @@ export function filterByField(
   compareType: FilterParams['compareType'],
   params?: Omit<FilterParams, 'values' | 'compareType'>,
 ): void {
-  let filter: WhereOperators | OrOperator;
+  let filter: WhereOperators;
   if (compareType === 'numberRange') {
     if (!values) {
       return;
