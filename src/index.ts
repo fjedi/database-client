@@ -111,6 +111,7 @@ export type {
   InitOptions,
   BuildOptions,
   SetOptions,
+  CreationAttributes,
 } from 'sequelize';
 
 export * from './helpers';
