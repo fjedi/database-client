@@ -257,17 +257,13 @@ export type SortOptions = {
 ///
 /// HOOKS
 ///
-type DatabaseHookModelFields = {
-  [key: string]: unknown;
-};
-
 export type DatabaseHookModel<T extends DatabaseModel> = T & {
-  changedFields: string[];
-  oldValues: DatabaseHookModelFields;
-  newValues: DatabaseHookModelFields;
-  _changed: Set<string>;
-  _previousDataValues: Record<string, unknown>;
-  dataValues: Record<string, unknown>;
+  changedFields: Array<StringKeyOf<Partial<ModelAttributes<T>>>>;
+  oldValues: Partial<ModelAttributes<T>>;
+  newValues: Partial<ModelAttributes<T>>;
+  _changed: Set<Array<StringKeyOf<Partial<ModelAttributes<T>>>>>;
+  _previousDataValues: ModelAttributes<T>;
+  dataValues: ModelAttributes<T>;
 };
 
 export type DatabaseHookOptions<T extends DatabaseModel> = {
