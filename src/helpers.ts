@@ -41,18 +41,9 @@ export type TimeRangeType = { from?: string | Date; to?: string | Date };
 
 export type NumberRangeType = { min?: number; max?: number };
 
-export type CompareValues =
-  | string
-  | string[]
-  | number
-  | number[]
-  | Array<string | number>
-  | TimeRangeType
-  | NumberRangeType
-  | undefined
-  | undefined[]
-  | null[]
-  | null;
+export type CompareValue = string | number | null | undefined;
+
+export type CompareValues = CompareValue | CompareValue[] | TimeRangeType | NumberRangeType;
 
 export type FilterParams = {
   values: CompareValues;
@@ -89,18 +80,14 @@ export function createFilter(params: FilterParams): WhereOperators | OrOperator 
   if (compareType === 'timeRange' || compareType === 'numberRange') {
     throw new Error(`To filter by date- or number range, use "createRangeFilter" helper`);
   }
-  if (
-    values === null ||
-    (typeof values === 'string' && values.length > 0) ||
-    typeof values === 'number'
-  ) {
+  if (values === null || (typeof values === 'string' && values) || typeof values === 'number') {
     const compareSymbol = getCompareSymbol(compareType, values);
     return {
       [compareSymbol]: ['like', 'iLike', 'notLike', 'notILike'].includes(compareType)
         ? `%${values}%`
         : values,
     };
-  } else if (Array.isArray(values) && compact(values).length > 0) {
+  } else if (Array.isArray(values) && compact(values).length) {
     const vals = compact(values);
     if (vals.length > 0) {
       const arrayOperator = params?.arrayOperator || 'OR';
