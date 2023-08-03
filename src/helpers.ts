@@ -76,7 +76,7 @@ export function getCompareSymbol(
   return Op[symbol];
 }
 
-export function createFilter(params: FilterParams): WhereOperators {
+export function createFilter(params: FilterParams): WhereOperators | null {
   const { values, compareType } = params;
   if (compareType === 'timeRange' || compareType === 'numberRange') {
     throw new Error(`To filter by date- or number range, use "createRangeFilter" helper`);
@@ -114,7 +114,8 @@ export function createFilter(params: FilterParams): WhereOperators {
       }
     }
   }
-  return {};
+
+  return null;
 }
 
 export type RangeFilterValue =
@@ -127,7 +128,7 @@ export type RangeFilterValue =
       max?: TimeRangeType['to'];
     };
 
-export function createRangeFilter(range: RangeFilterValue): WhereOperators {
+export function createRangeFilter(range: RangeFilterValue): WhereOperators | null {
   const { min, max } = range;
   if (typeof min !== 'undefined' && typeof max !== 'undefined') {
     return { [Op.between]: [min, max] };
@@ -138,7 +139,7 @@ export function createRangeFilter(range: RangeFilterValue): WhereOperators {
   if (typeof max !== 'undefined') {
     return { [Op.lte]: max };
   }
-  return {};
+  return null;
 }
 
 export function filterByField(
@@ -148,7 +149,7 @@ export function filterByField(
   compareType: FilterParams['compareType'],
   params?: Omit<FilterParams, 'values' | 'compareType'>,
 ): void {
-  let filter: WhereOperators;
+  let filter: WhereOperators | null;
   if (compareType === 'numberRange') {
     if (!values) {
       return;
@@ -168,7 +169,7 @@ export function filterByField(
       compareType,
     });
   }
-  if (filter && Object.keys(filter).length) {
+  if (filter) {
     where[field] = filter;
   }
 }
