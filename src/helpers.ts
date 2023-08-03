@@ -32,6 +32,7 @@ export type CompareType =
   | 'notILike'
   | 'in'
   | 'notIn'
+  | 'not'
   | 'eq'
   | 'ne'
   | 'numberRange'
