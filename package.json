@@ -43,7 +43,7 @@
     "@types/bluebird": "3.5.39",
     "@types/graphql-list-fields": "2.0.3",
     "@types/json-buffer": "3.0.0",
-    "@types/lodash": "4.14.198",
+    "@types/lodash": "4.14.199",
     "@types/shimmer": "1.0.2",
     "dataloader-sequelize": "2.3.3",
     "graphql-list-fields": "2.0.2",
