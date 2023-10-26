@@ -98,11 +98,18 @@ export default async function runMigrations(
     const doneStr = `DB-MIGRATION ${cmd.toUpperCase()} DONE`;
     logger.info(doneStr);
     logger.info('='.repeat(doneStr.length));
-  } catch (err) {
+  } catch (e: unknown) {
+    const err = e as Error | Record<string, unknown>;
     const errorStr = `DB-MIGRATION ${cmd.toUpperCase()} ERROR`;
     logger.info(errorStr);
     logger.info('='.repeat(errorStr.length));
-    logger.info(err as Error);
+    logger.error(err as Error);
+    if ('sql' in err) {
+      const sql = 'original' in err ? (err.original as { sql: string }).sql : err.sql;
+      const sqlMessage =
+        'original' in err ? (err.original as { sqlMessage: string }).sqlMessage : null;
+      logger.info({ sql, sqlMessage });
+    }
     logger.info('='.repeat(errorStr.length));
   }
 }
