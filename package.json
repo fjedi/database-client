@@ -44,7 +44,7 @@
     "@types/graphql-list-fields": "2.0.6",
     "@types/json-buffer": "3.0.2",
     "@types/lodash": "4.14.200",
-    "@types/shimmer": "1.0.4",
+    "@types/shimmer": "1.0.5",
     "dataloader-sequelize": "2.3.3",
     "graphql-list-fields": "2.0.2",
     "lodash": "4.17.21",
