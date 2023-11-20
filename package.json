@@ -48,7 +48,7 @@
     "dataloader-sequelize": "2.3.3",
     "graphql-list-fields": "2.0.2",
     "lodash": "4.17.21",
-    "sequelize": "6.35.0",
+    "sequelize": "6.35.1",
     "sequelize-cli": "6.6.2",
     "umzug": "3.4.0"
   },
