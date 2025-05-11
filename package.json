@@ -49,7 +49,7 @@
     "graphql-list-fields": "2.0.4",
     "lodash": "4.17.21",
     "sequelize": "6.37.7",
-    "sequelize-cli": "6.6.2",
+    "sequelize-cli": "6.6.3",
     "umzug": "3.8.2"
   },
   "devDependencies": {
